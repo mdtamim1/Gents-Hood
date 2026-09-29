@@ -64,3 +64,9 @@ export const contactFormSchema = z.object({
 });
 
 export type ContactFormInput = z.infer<typeof contactFormSchema>;
+
+export const newsletterSubscribeSchema = z.object({
+  email: z.string().email('Please enter a valid email address to join the Hood'),
+});
+
+export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>;
