@@ -1,10 +1,23 @@
+import React from 'react';
+import { Hero } from '@/components/landing/Hero';
+import { GalleryStrip } from '@/components/landing/GalleryStrip';
+import { FeaturedProduct } from '@/components/landing/FeaturedProduct';
+import { TrustBar } from '@/components/landing/TrustBar';
+
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
-      <h1 className="text-4xl font-bold tracking-tight text-ink sm:text-6xl">GENTS HOOD</h1>
-      <p className="mt-4 text-sm font-medium uppercase tracking-widest text-muted">
-        Fashion That Moves With You
-      </p>
-    </main>
+    <>
+      {/* 1. Hero Section (with giant typography & cutout model overlap) */}
+      <Hero />
+
+      {/* 2. Main Product Gallery Strip (full-width ink band with 3 perspective cards) */}
+      <GalleryStrip />
+
+      {/* 3. NEW VIBES Main Product Section (interactive swatches, size picker, zoom gallery) */}
+      <FeaturedProduct />
+
+      {/* 4. Trust Bar (4 key service guarantees with line icons) */}
+      <TrustBar />
+    </>
   );
 }
