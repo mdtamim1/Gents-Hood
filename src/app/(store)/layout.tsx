@@ -1,9 +1,14 @@
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { AnnouncementBar } from '@/components/layout/AnnouncementBar';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { ToastProvider } from '@/components/ui/Toast';
+
+const CartDrawer = dynamic(
+  () => import('@/components/cart/CartDrawer').then((mod) => mod.CartDrawer),
+  { ssr: false }
+);
 
 export default function StoreLayout({ children }: { children: React.ReactNode }) {
   return (

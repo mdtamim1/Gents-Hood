@@ -7,6 +7,7 @@ import { CheckCircle2, PhoneCall } from 'lucide-react';
 import { db } from '@/lib/db';
 import { formatPrice } from '@/lib/utils/money';
 import { Button } from '@/components/ui/Button';
+import { OrderSuccessTracker } from '@/components/checkout/OrderSuccessTracker';
 
 interface OrderSuccessPageProps {
   params: {
@@ -32,8 +33,13 @@ export default async function OrderSuccessPage({ params }: OrderSuccessPageProps
     notFound();
   }
 
+  const totalItemCount = order.items.reduce((sum, item) => sum + item.qty, 0);
+
   return (
     <main className="mx-auto min-h-[80vh] max-w-[880px] px-6 py-12 sm:px-10 sm:py-20">
+      {/* Client Analytics Dispatch & Cart Cleanup */}
+      <OrderSuccessTracker orderNo={order.orderNo} total={order.total} itemCount={totalItemCount} />
+
       <div className="space-y-4 text-center">
         {/* Animated Check Icon */}
         <div className="mx-auto flex h-16 w-16 animate-bounce items-center justify-center rounded-full bg-ink text-cream">

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
+import { trackInitiateCheckout } from '@/lib/analytics';
 
 export function CheckoutForm() {
   const router = useRouter();
@@ -28,12 +29,18 @@ export function CheckoutForm() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Generate unique idempotency key once on component mount
+  const subtotal = getSubtotal();
+
+  // Generate unique idempotency key once on component mount & fire initiate_checkout event
   useEffect(() => {
     setIdempotencyKey(`IDEM-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
-  }, []);
-
-  const subtotal = getSubtotal();
+    if (items.length > 0) {
+      trackInitiateCheckout({
+        num_items: items.reduce((sum, i) => sum + i.quantity, 0),
+        value: subtotal,
+      });
+    }
+  }, [items, subtotal]);
 
   // Determine delivery charge dynamically based on district selection & subtotal
   const isDhaka = shippingDistrict.toLowerCase().includes('dhaka');

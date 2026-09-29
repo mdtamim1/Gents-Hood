@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { ProductWithRelations } from '@/types';
+import { trackAddToCart } from '@/lib/analytics';
 
 interface FeaturedProductProps {
   initialProduct?: ProductWithRelations | null;
@@ -114,6 +115,12 @@ export function FeaturedProduct({ initialProduct, freeDeliveryMin = 1999 }: Feat
       quantity,
     });
 
+    trackAddToCart({
+      content_name: productName,
+      content_ids: [initialProduct?.id || 'new-vibes-main-product'],
+      value: productPrice * quantity,
+    });
+
     showToast('Added to your shopping bag.', 'success');
   };
 
@@ -133,6 +140,13 @@ export function FeaturedProduct({ initialProduct, freeDeliveryMin = 1999 }: Feat
       color: selectedColor,
       quantity,
     });
+
+    trackAddToCart({
+      content_name: productName,
+      content_ids: [initialProduct?.id || 'new-vibes-main-product'],
+      value: productPrice * quantity,
+    });
+
     setIsOpen(false);
     router.push('/checkout');
   };

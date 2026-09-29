@@ -8,6 +8,7 @@ import { ProductWithRelations } from '@/types';
 import { formatPrice } from '@/lib/utils/money';
 import { useCartStore } from '@/store/cart';
 import { useToast } from '@/components/ui/Toast';
+import { trackAddToCart } from '@/lib/analytics';
 
 interface ProductCardProps {
   product: ProductWithRelations;
@@ -70,6 +71,12 @@ export function ProductCard({ product }: ProductCardProps) {
       size: primaryVariant?.size || 'M',
       color: primaryVariant?.color || 'Charcoal Black',
       quantity: 1,
+    });
+
+    trackAddToCart({
+      content_name: product.name,
+      content_ids: [product.id],
+      value: product.price,
     });
 
     showToast(`Added ${product.name} to bag`, 'success');

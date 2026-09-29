@@ -18,8 +18,62 @@ export default async function HomePage() {
     getTrendingProducts(8),
   ]);
 
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+
+  let parsedSocial: Record<string, string> = {};
+  if (siteSettings?.socialLinks) {
+    try {
+      parsedSocial = JSON.parse(siteSettings.socialLinks);
+    } catch {
+      parsedSocial = {};
+    }
+  }
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Gents Hood',
+    url: siteUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${siteUrl}/trending?search={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Gents Hood',
+    url: siteUrl,
+    logo: `${siteUrl}/images/hero-model.png`,
+    sameAs: [
+      parsedSocial.facebook,
+      parsedSocial.instagram,
+      parsedSocial.tiktok,
+      parsedSocial.youtube,
+    ].filter(Boolean),
+    contactPoint: {
+      '@type': 'ContactPoint',
+      telephone: siteSettings?.contactPhone || '+880 1700-000000',
+      contactType: 'Customer Support',
+      areaServed: 'BD',
+      availableLanguage: ['English', 'Bengali'],
+    },
+  };
+
   return (
     <>
+      {/* Schema.org Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
+
       {/* 1. Hero Section (with giant typography & cutout model overlap) */}
       <Hero />
 

@@ -6,6 +6,8 @@ import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.ser
 import { getAdminSession } from '@/lib/auth';
 import { createAuditLog } from '@/lib/services/audit.service';
 
+export const dynamic = 'force-dynamic';
+
 const settingsUpdateSchema = z.object({
   announcementText: z.string().optional(),
   freeDeliveryMin: z.number().int().nonnegative().optional(),

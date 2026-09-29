@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { trackViewContent, trackAddToCart } from '@/lib/analytics';
 
 interface ProductDetailsProps {
   product: ProductWithRelations;
@@ -21,6 +22,15 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const addItem = useCartStore((state) => state.addItem);
   const setIsCartOpen = useCartStore((state) => state.setIsOpen);
   const { showToast } = useToast();
+
+  // Fire ViewContent analytics event on mount
+  useEffect(() => {
+    trackViewContent({
+      content_name: product.name,
+      content_ids: [product.id, product.sku || product.slug],
+      value: product.price,
+    });
+  }, [product.id, product.name, product.sku, product.slug, product.price]);
 
   // Extract unique colors
   const colors = useMemo(() => {
@@ -91,6 +101,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       quantity,
     });
 
+    trackAddToCart({
+      content_name: product.name,
+      content_ids: [product.id],
+      value: product.price * quantity,
+    });
+
     showToast(`Added ${product.name} to bag`, 'success');
   };
 
@@ -114,6 +130,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       size: selectedSize,
       color: selectedColor,
       quantity,
+    });
+
+    trackAddToCart({
+      content_name: product.name,
+      content_ids: [product.id],
+      value: product.price * quantity,
     });
 
     setIsCartOpen(false);

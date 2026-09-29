@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { createOrderSchema } from '@/lib/validators';
 import { createOrder } from '@/lib/services/order.service';
 import { rateLimit } from '@/lib/rate-limit';
+import { sendServerCapiEvent } from '@/lib/analytics';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +39,15 @@ export async function POST(request: NextRequest) {
 
     // 3. Create Order via transactional service
     const order = await createOrder(validationResult.data);
+
+    // 4. Dispatch server-side Conversions API (CAPI) event asynchronously
+    sendServerCapiEvent('Purchase', {
+      orderId: order.orderNo,
+      value: order.total,
+      currency: 'BDT',
+      clientIp: ip,
+      phone: order.shippingPhone,
+    }).catch(() => {});
 
     return NextResponse.json(
       {
