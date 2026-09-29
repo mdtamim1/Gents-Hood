@@ -146,7 +146,8 @@ k6 run tests/k6-load-test.js
 2. Obtain two connection strings:
    - **Pooled URL** (`DATABASE_URL`): Points to port `6543` / `?pgbouncer=true`.
    - **Direct URL** (`DIRECT_URL`): Points to direct PostgreSQL port `5432` for migrations.
-3. Copy `docs/schema.postgresql.prisma` to `prisma/schema.prisma` before running production migrations.
+3. Copy `docs/schema.postgresql.prisma.example` to `prisma/schema.prisma` before running production migrations.
+
 
 ### Step 2: Deploy to Vercel
 1. Import the repository into your Vercel team dashboard.
@@ -186,10 +187,12 @@ k6 run tests/k6-load-test.js
 
 ```
 gents-hood/
+├── docs/
+│   └── schema.postgresql.prisma.example # PostgreSQL production schema reference
 ├── prisma/
 │   ├── schema.prisma                  # Active database schema
-│   ├── schema.postgresql.prisma       # Production PostgreSQL schema
 │   └── seed.ts                        # Seeding script
+
 ├── public/
 │   ├── images/                        # Models, products, textures
 │   └── icons/                         # Line badges
