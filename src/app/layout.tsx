@@ -10,6 +10,7 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: 'Gents Hood | Premium Menswear & Streetwear Fashion',
   description:
     'Fashion that moves with you. Elevate your everyday style with Gents Hood premium menswear and essentials.',

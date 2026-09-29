@@ -3,17 +3,19 @@ import { Hero } from '@/components/landing/Hero';
 import { GalleryStrip } from '@/components/landing/GalleryStrip';
 import { FeaturedProduct } from '@/components/landing/FeaturedProduct';
 import { TrustBar } from '@/components/landing/TrustBar';
-import { getFeaturedProduct } from '@/lib/services/product.service';
+import { TrendingGrid } from '@/components/landing/TrendingGrid';
+import { getFeaturedProduct, getTrendingProducts } from '@/lib/services/product.service';
 import { getSiteSettings } from '@/lib/services/settings.service';
 
 // Incremental Static Regeneration (ISR) every 60 seconds
 export const revalidate = 60;
 
 export default async function HomePage() {
-  // Fetch real database records via cached backend services
-  const [featuredProduct, siteSettings] = await Promise.all([
+  // Fetch real database records in parallel via cached backend services
+  const [featuredProduct, siteSettings, trendingProducts] = await Promise.all([
     getFeaturedProduct(),
     getSiteSettings(),
+    getTrendingProducts(8),
   ]);
 
   return (
@@ -32,6 +34,9 @@ export default async function HomePage() {
 
       {/* 4. Trust Bar (4 key service guarantees with line icons) */}
       <TrustBar />
+
+      {/* 5. BEST OF GENTS HOOD (Top 8 Trending grid with wishlist & quick add) */}
+      <TrendingGrid products={trendingProducts} />
     </>
   );
 }
