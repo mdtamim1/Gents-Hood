@@ -1,0 +1,12 @@
+:root {
+  --ink: #171718; /* reference black equivalent (near-black charcoal) */
+  --cream: #fffff3; /* reference white/light equivalent */
+  --cream-soft: #f4f4e6; /* section bg variation (slightly darker cream) */
+  --ink-soft: #2a2a2c; /* hover on ink */
+  --line: rgba(23, 23, 24, 0.12); /* borders on cream */
+  --line-inv: rgba(255, 255, 243, 0.16); /* borders on ink */
+  --muted: #6b6b66; /* secondary text on cream */
+  --muted-inv: #b9b9ae; /* secondary text on ink */
+  --success: #2e7d5b;
+  --danger: #b3382c;
+}
