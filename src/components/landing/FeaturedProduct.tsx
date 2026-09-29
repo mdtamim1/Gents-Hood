@@ -9,40 +9,63 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
+import { ProductWithRelations } from '@/types';
 
-interface ProductColor {
-  name: string;
-  hex: string;
+interface FeaturedProductProps {
+  initialProduct?: ProductWithRelations | null;
+  freeDeliveryMin?: number;
 }
 
-const COLORS: ProductColor[] = [
-  { name: 'Charcoal Black', hex: '#171718' },
-  { name: 'Deep Slate', hex: '#2A2E33' },
-  { name: 'Muted Taupe', hex: '#5E5A54' },
-];
-
-const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
-
-const PRODUCT_IMAGES = [
-  { id: '1', url: '/images/new-vibes-main.jpg', alt: 'Structured City Overcoat - Front Profile' },
-  {
-    id: '2',
-    url: '/images/gallery-detail.jpg',
-    alt: 'Structured City Overcoat - Fabric & Texture',
-  },
-  {
-    id: '3',
-    url: '/images/gallery-lifestyle.jpg',
-    alt: 'Structured City Overcoat - Lifestyle Silhouette',
-  },
-];
-
-export function FeaturedProduct() {
+export function FeaturedProduct({ initialProduct, freeDeliveryMin = 1999 }: FeaturedProductProps) {
   const router = useRouter();
   const { addItem, setIsOpen } = useCartStore();
   const { showToast } = useToast();
 
-  const [selectedColor, setSelectedColor] = useState<string>(COLORS[0].name);
+  // Extract colors from database variants or fallback
+  const dbColors = React.useMemo(() => {
+    if (!initialProduct?.variants || initialProduct.variants.length === 0) {
+      return [
+        { name: 'Charcoal Black', hex: '#171718' },
+        { name: 'Deep Slate', hex: '#2A2E33' },
+        { name: 'Muted Taupe', hex: '#5E5A54' },
+      ];
+    }
+    const colorMap = new Map<string, string>();
+    initialProduct.variants.forEach((v) => {
+      if (!colorMap.has(v.color)) {
+        colorMap.set(v.color, v.colorHex || '#171718');
+      }
+    });
+    return Array.from(colorMap.entries()).map(([name, hex]) => ({ name, hex }));
+  }, [initialProduct]);
+
+  // Extract sizes from database variants or fallback
+  const dbSizes = React.useMemo(() => {
+    if (!initialProduct?.variants || initialProduct.variants.length === 0) {
+      return ['S', 'M', 'L', 'XL', 'XXL'];
+    }
+    const sizeSet = new Set<string>();
+    initialProduct.variants.forEach((v) => sizeSet.add(v.size));
+    return Array.from(sizeSet);
+  }, [initialProduct]);
+
+  // Images from database or fallback
+  const productImages = React.useMemo(() => {
+    if (initialProduct?.images && initialProduct.images.length > 0) {
+      return initialProduct.images.map((img) => ({
+        id: img.id,
+        url: img.url,
+        alt: img.alt || initialProduct.name,
+      }));
+    }
+    return [
+      { id: '1', url: '/images/new-vibes-main.jpg', alt: 'Front Profile' },
+      { id: '2', url: '/images/gallery-detail.jpg', alt: 'Fabric & Texture' },
+      { id: '3', url: '/images/gallery-lifestyle.jpg', alt: 'Lifestyle Silhouette' },
+    ];
+  }, [initialProduct]);
+
+  const [selectedColor, setSelectedColor] = useState<string>(dbColors[0]?.name || 'Charcoal Black');
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
@@ -51,9 +74,21 @@ export function FeaturedProduct() {
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const productPrice = 3650;
-  const comparePrice = 4500;
-  const stockRemaining = 4;
+  const productName = initialProduct?.name || 'Structured City Overcoat';
+  const productPrice = initialProduct?.price || 3650;
+  const comparePrice = initialProduct?.comparePrice || 4500;
+  const discountPercent = comparePrice
+    ? Math.round(((comparePrice - productPrice) / comparePrice) * 100)
+    : 0;
+
+  // Selected variant for stock check
+  const activeVariant = React.useMemo(() => {
+    return initialProduct?.variants.find(
+      (v) => v.color === selectedColor && v.size === selectedSize
+    );
+  }, [initialProduct, selectedColor, selectedSize]);
+
+  const stockRemaining = activeVariant ? activeVariant.stock : 6;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -69,11 +104,11 @@ export function FeaturedProduct() {
     }
 
     addItem({
-      productId: 'new-vibes-main-product',
-      variantId: `${selectedColor}-${selectedSize}`,
-      name: 'Structured City Overcoat',
+      productId: initialProduct?.id || 'new-vibes-main-product',
+      variantId: activeVariant?.id || `${selectedColor}-${selectedSize}`,
+      name: productName,
       price: productPrice,
-      image: PRODUCT_IMAGES[activeImageIndex].url,
+      image: productImages[activeImageIndex]?.url || '/images/new-vibes-main.jpg',
       size: selectedSize,
       color: selectedColor,
       quantity,
@@ -88,13 +123,12 @@ export function FeaturedProduct() {
       return;
     }
 
-    // Add item and redirect directly to checkout
     addItem({
-      productId: 'new-vibes-main-product',
-      variantId: `${selectedColor}-${selectedSize}`,
-      name: 'Structured City Overcoat',
+      productId: initialProduct?.id || 'new-vibes-main-product',
+      variantId: activeVariant?.id || `${selectedColor}-${selectedSize}`,
+      name: productName,
       price: productPrice,
-      image: PRODUCT_IMAGES[activeImageIndex].url,
+      image: productImages[activeImageIndex]?.url || '/images/new-vibes-main.jpg',
       size: selectedSize,
       color: selectedColor,
       quantity,
@@ -114,7 +148,7 @@ export function FeaturedProduct() {
               <h2 className="heading-lg mt-1 text-ink">NEW VIBES</h2>
               <div className="mt-3 flex items-center gap-3">
                 <h3 className="text-xl font-bold uppercase tracking-tight text-ink sm:text-2xl">
-                  Structured City Overcoat
+                  {productName}
                 </h3>
               </div>
 
@@ -124,22 +158,25 @@ export function FeaturedProduct() {
                   <span className="text-2xl font-extrabold text-ink">
                     {formatPrice(productPrice)}
                   </span>
-                  <span className="text-base text-muted line-through">
-                    {formatPrice(comparePrice)}
-                  </span>
+                  {comparePrice && (
+                    <span className="text-base text-muted line-through">
+                      {formatPrice(comparePrice)}
+                    </span>
+                  )}
                 </div>
-                <Badge variant="default" size="md">
-                  Save 19%
-                </Badge>
+                {discountPercent > 0 && (
+                  <Badge variant="default" size="md">
+                    Save {discountPercent}%
+                  </Badge>
+                )}
                 <span className="ml-auto text-xs font-medium uppercase tracking-wider text-muted">
                   ★ 4.9 (42 verified reviews)
                 </span>
               </div>
 
               <p className="mt-5 text-xs leading-relaxed text-muted sm:text-sm">
-                Designed for tailored modern versatility. Engineered from custom heavy-weight milled
-                twill featuring relaxed sculpted shoulders, clean welt pockets, and an architectural
-                storm collar.
+                {initialProduct?.shortDescription ||
+                  'Designed for tailored modern versatility. Engineered from custom heavy-weight milled twill featuring relaxed drop shoulders, deep welt pockets, and an architectural storm collar.'}
               </p>
             </div>
 
@@ -151,7 +188,7 @@ export function FeaturedProduct() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                {COLORS.map((c) => (
+                {dbColors.map((c) => (
                   <button
                     key={c.name}
                     type="button"
@@ -188,7 +225,7 @@ export function FeaturedProduct() {
               </div>
 
               <div className="grid grid-cols-5 gap-2.5">
-                {SIZES.map((size) => (
+                {dbSizes.map((size) => (
                   <button
                     key={size}
                     type="button"
@@ -239,9 +276,9 @@ export function FeaturedProduct() {
 
               <div className="text-right">
                 <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-danger">
-                  ● Only {stockRemaining} items left in stock
+                  ● {stockRemaining > 0 ? `Only ${stockRemaining} left in stock` : 'Out of stock'}
                 </span>
-                <p className="text-[10px] tracking-wide text-muted">High demand item</p>
+                <p className="text-[10px] tracking-wide text-muted">High demand piece</p>
               </div>
             </div>
 
@@ -251,7 +288,7 @@ export function FeaturedProduct() {
                 variant="outline"
                 size="lg"
                 onClick={handleAddToCart}
-                disabled={!selectedSize}
+                disabled={!selectedSize || stockRemaining === 0}
                 className="w-full"
               >
                 Add To Cart
@@ -260,7 +297,7 @@ export function FeaturedProduct() {
                 variant="primary"
                 size="lg"
                 onClick={handleOrderNow}
-                disabled={!selectedSize}
+                disabled={!selectedSize || stockRemaining === 0}
                 className="w-full"
               >
                 Order Now
@@ -336,37 +373,29 @@ export function FeaturedProduct() {
 
               <div className="pt-4 text-xs leading-relaxed text-muted">
                 {activeTab === 'details' && (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>
-                      Engineered with relaxed shoulders for seamless layering over knitwear or
-                      hoodies.
-                    </li>
-                    <li>Twin deep angled exterior welt pockets and interior passport pocket.</li>
-                    <li>Concealed front storm flap with matte hardware closure.</li>
-                  </ul>
+                  <p>
+                    {initialProduct?.description ||
+                      'Engineered with relaxed shoulders for seamless layering. Twin deep angled exterior welt pockets and interior passport pocket with concealed storm placket.'}
+                  </p>
                 )}
                 {activeTab === 'fabric' && (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Material: 65% Premium Combed Cotton, 35% Wool Blend.</li>
-                    <li>Weight: 420 GSM heavy-density construction.</li>
-                    <li>
-                      Care: Professional dry clean recommended or gentle cold hand wash. Do not
-                      tumble dry.
-                    </li>
-                  </ul>
+                  <div className="space-y-1">
+                    <p>
+                      <strong>Fabric:</strong>{' '}
+                      {initialProduct?.fabric || '65% Combed Cotton, 35% Wool Blend'}
+                    </p>
+                    <p>
+                      <strong>Care:</strong> {initialProduct?.care || 'Dry clean recommended.'}
+                    </p>
+                  </div>
                 )}
                 {activeTab === 'fit' && (
-                  <p>
-                    Relaxed contemporary cut. Fits true to size for an editorial streetwear
-                    silhouette. If you prefer a traditional slim fit, we recommend sizing down one
-                    size.
-                  </p>
+                  <p>{initialProduct?.fit || 'Relaxed contemporary cut. Fits true to size.'}</p>
                 )}
                 {activeTab === 'delivery' && (
                   <p>
-                    Cash on Delivery available all across Bangladesh. Inside Dhaka delivery: ৳70.
-                    Outside Dhaka: ৳130. Orders above ৳1,999 qualify for Free Delivery
-                    automatically.
+                    Cash on Delivery available all across Bangladesh. Orders above ৳
+                    {freeDeliveryMin} qualify for Free Delivery automatically.
                   </p>
                 )}
               </div>
@@ -377,7 +406,7 @@ export function FeaturedProduct() {
           <div className="flex flex-col-reverse gap-4 sm:flex-row lg:sticky lg:top-24 lg:col-span-6">
             {/* Thumbnail Selectors */}
             <div className="flex justify-center gap-3 sm:flex-col sm:justify-start">
-              {PRODUCT_IMAGES.map((img, idx) => (
+              {productImages.map((img, idx) => (
                 <button
                   key={img.id}
                   type="button"
@@ -402,8 +431,8 @@ export function FeaturedProduct() {
               onMouseMove={handleMouseMove}
             >
               <Image
-                src={PRODUCT_IMAGES[activeImageIndex].url}
-                alt={PRODUCT_IMAGES[activeImageIndex].alt}
+                src={productImages[activeImageIndex]?.url || '/images/new-vibes-main.jpg'}
+                alt={productImages[activeImageIndex]?.alt || productName}
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 640px"

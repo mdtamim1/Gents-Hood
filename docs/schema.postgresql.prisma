@@ -3,8 +3,45 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  COD
+  BKASH
+  NAGAD
+  CARD
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum AdminRole {
+  OWNER
+  STAFF
 }
 
 // Tables
@@ -17,14 +54,14 @@ model Product {
   price            Int
   comparePrice     Int?
   sku              String?
-  status           String           @default("ACTIVE")
+  status           ProductStatus    @default(ACTIVE)
   isTrending       Boolean          @default(false)
   trendingOrder    Int              @default(0)
   fabric           String?
   fit              String?
   care             String?
-  sizeChartJson    String?
-  tagsJson         String?
+  sizeChartJson    Json?
+  tagsJson         Json?
   seoTitle         String?
   seoDescription   String?
   createdAt        DateTime         @default(now())
@@ -74,8 +111,8 @@ model SiteSetting {
   contactEmail        String?
   whatsapp            String?
   address             String?
-  socialLinks         String?
-  deliveryCharges     String?
+  socialLinks         Json?
+  deliveryCharges     Json?
   heroTagline         String?
   heroBackgroundWord  String?  @default("GENTS HOOD")
   createdAt           DateTime @default(now())
@@ -116,9 +153,9 @@ model Order {
   id               String               @id @default(cuid())
   orderNo          String               @unique
   customerId       String?
-  status           String               @default("PENDING")
-  paymentMethod    String               @default("COD")
-  paymentStatus    String               @default("UNPAID")
+  status           OrderStatus          @default(PENDING)
+  paymentMethod    PaymentMethod        @default(COD)
+  paymentStatus    PaymentStatus        @default(UNPAID)
   subtotal         Int
   deliveryCharge   Int
   discount         Int                  @default(0)
@@ -162,7 +199,7 @@ model OrderItem {
 model OrderStatusHistory {
   id        String      @id @default(cuid())
   orderId   String
-  status    String
+  status    OrderStatus
   note      String?
   createdAt DateTime    @default(now())
 
@@ -175,7 +212,7 @@ model AdminUser {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String
-  role         String    @default("STAFF")
+  role         AdminRole @default(STAFF)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -186,7 +223,7 @@ model AuditLog {
   action    String
   entity    String
   entityId  String?
-  metaJson  String?
+  metaJson  Json?
   createdAt DateTime @default(now())
 
   @@index([adminId])
