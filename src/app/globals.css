@@ -37,3 +37,46 @@
     color: var(--cream);
   }
 }
+
+@layer utilities {
+  /* Typography scale matching GAZU reference spec */
+  .label-caps {
+    font-size: 0.6875rem; /* 11px */
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    font-weight: 500;
+  }
+
+  .nav-link {
+    font-size: 0.75rem; /* 12px */
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+
+  .display-hero {
+    font-size: clamp(3.5rem, 15vw, 16rem);
+    line-height: 0.88;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+  }
+
+  .heading-lg {
+    font-size: clamp(2rem, 5vw, 4rem);
+    line-height: 0.95;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+  }
+
+  .heading-md {
+    font-size: clamp(1.25rem, 2.5vw, 2rem);
+    line-height: 1.1;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+  }
+}
