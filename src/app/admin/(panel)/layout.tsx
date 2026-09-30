@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/auth';
 import { AdminSidebar } from './AdminSidebar';
 import { db } from '@/lib/db';
+import { ToastProvider } from '@/components/ui/Toast';
 
 export default async function AdminPanelLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
@@ -30,19 +31,21 @@ export default async function AdminPanelLayout({ children }: { children: React.R
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0a0b]">
-      <AdminSidebar
-        session={{
-          id: session.id,
-          email: session.email,
-          name: user.name,
-          role: user.role as 'OWNER' | 'STAFF',
-          displayColor: user.displayColor || '#6366f1',
-        }}
-      />
-      <main className="flex-1 overflow-y-auto">
-        <div className="min-h-full p-6">{children}</div>
-      </main>
-    </div>
+    <ToastProvider>
+      <div className="flex h-screen overflow-hidden bg-[#0a0a0b]">
+        <AdminSidebar
+          session={{
+            id: session.id,
+            email: session.email,
+            name: user.name,
+            role: user.role as 'OWNER' | 'STAFF',
+            displayColor: user.displayColor || '#6366f1',
+          }}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="min-h-full p-6">{children}</div>
+        </main>
+      </div>
+    </ToastProvider>
   );
 }

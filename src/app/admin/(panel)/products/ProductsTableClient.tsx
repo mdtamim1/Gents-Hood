@@ -144,7 +144,7 @@ export function ProductsTableClient({ initialProducts }: { initialProducts: Prod
               </tr>
             ) : (
               filtered.map((product) => {
-                const totalStock = product.variants.reduce((acc, v) => acc + v.stock, 0);
+                const totalStock = product.variants?.reduce((acc, v) => acc + v.stock, 0) ?? 0;
                 const isToggling = togglingId === product.id;
                 const isDeleting = deletingId === product.id;
 
@@ -205,7 +205,7 @@ export function ProductsTableClient({ initialProducts }: { initialProducts: Prod
                               : 'text-cream'
                         }`}
                       >
-                        {totalStock} in {product.variants.length} size(s)
+                        {totalStock} in {product.variants?.length ?? 0} size(s)
                       </span>
                     </td>
 
