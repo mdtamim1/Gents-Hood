@@ -512,18 +512,6 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
 
             <div>
               <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted">
-                YouTube Channel URL
-              </label>
-              <input
-                type="text"
-                value={form.youtube}
-                onChange={(e) => setForm({ ...form, youtube: e.target.value })}
-                className="border-muted/30 w-full rounded-[1px] border bg-ink px-3 py-2 text-xs text-cream focus:border-cream focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted">
                 Direct WhatsApp Link
               </label>
               <input

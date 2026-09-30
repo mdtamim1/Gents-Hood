@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -89,16 +90,30 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Bar with Logo & Close */}
-        <div className="flex h-16 items-center justify-between border-b border-white/15 px-6">
-          <span className="text-base font-extrabold uppercase tracking-[0.2em] text-cream">
-            GENTS HOOD
-          </span>
+        {/* Top Bar with Center-Aligned Logo & Close Button */}
+        <div className="relative flex h-16 items-center justify-center border-b border-white/15 px-6">
+          <Link
+            href="/"
+            onClick={onClose}
+            aria-label="Gents Hood Home"
+            className="flex select-none items-center justify-center py-1 transition-opacity hover:opacity-85"
+          >
+            <div className="relative h-10 w-28">
+              <Image
+                src="/images/logo.png"
+                alt="Gents Hood"
+                fill
+                priority
+                className="object-contain brightness-0 invert"
+                sizes="112px"
+              />
+            </div>
+          </Link>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation menu"
-            className="text-cream/80 flex h-8 w-8 items-center justify-center rounded-full transition-transform duration-200 hover:bg-white/10 hover:text-cream active:scale-90"
+            className="text-cream/80 absolute right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition-transform duration-200 hover:bg-white/10 hover:text-cream active:scale-90"
           >
             <svg
               className="h-5 w-5"

@@ -10,9 +10,7 @@ interface HeroProps {
   backgroundWord?: string | null;
 }
 
-export function Hero({ tagline, backgroundWord }: HeroProps) {
-  const currentYear = new Date().getFullYear();
-
+export function Hero({ tagline: _tagline, backgroundWord }: HeroProps) {
   const handleScrollToShop = () => {
     const section = document.getElementById('new-vibes');
     if (section) {
@@ -20,26 +18,10 @@ export function Hero({ tagline, backgroundWord }: HeroProps) {
     }
   };
 
-  const displayTagline = tagline || 'Fashion\nThat Moves\nWith You.';
   const displayWord = backgroundWord || 'GENTS HOOD';
 
   return (
     <section className="relative flex aspect-video w-full flex-col justify-between overflow-hidden border-b border-line bg-cream p-2.5 sm:aspect-auto sm:min-h-[640px] sm:px-10 sm:py-10 lg:min-h-[calc(100vh-5rem)] lg:px-14 lg:py-14">
-      {/* Top Tagline Row (matching editorial reference) */}
-      <div className="z-20 mx-auto w-full max-w-[1440px] px-1 sm:px-0">
-        <div className="max-w-xs">
-          <p className="label-caps text-[7.5px] leading-tight text-ink min-[380px]:text-[8px] sm:text-[11px] sm:leading-relaxed">
-            {displayTagline.split('\n').map((line, idx) => (
-              <React.Fragment key={idx}>
-                {line}
-                {idx < displayTagline.split('\n').length - 1 && <br />}
-              </React.Fragment>
-            ))}
-          </p>
-          <div className="mt-1 h-[1.5px] w-5 bg-ink sm:mt-2.5 sm:w-8" />
-        </div>
-      </div>
-
       {/* Center Giant Editorial Typography & Overlapping Model */}
       <div className="relative my-0 flex w-full flex-1 items-center justify-center sm:my-6">
         {/* Layer 1: Giant Wordmark behind model */}
@@ -73,36 +55,27 @@ export function Hero({ tagline, backgroundWord }: HeroProps) {
         </div>
       </div>
 
-      {/* Bottom Controls & Metadata */}
-      <div className="z-20 mx-auto flex w-full max-w-[1440px] -translate-y-2 flex-row items-end justify-between gap-2 px-1 pb-2 sm:translate-y-0 sm:gap-6 sm:px-0 sm:pb-0">
-        {/* CTAs: SHOP NOW & EXPLORE NEW IN side by side horizontally */}
-        <div className="flex flex-row items-center gap-2 sm:gap-6">
+      {/* Bottom Controls: SHOP NOW on Left, EXPLORE NEW IN on Right */}
+      <div className="z-20 mx-auto flex w-full max-w-[1440px] items-center justify-between px-2 pb-1.5 sm:px-0 sm:pb-0">
+        {/* Left: SHOP NOW Button */}
+        <div>
           <Button
             variant="primary"
             size="sm"
             onClick={handleScrollToShop}
-            className="h-auto px-3 py-1.5 text-[8.5px] uppercase tracking-looser sm:px-9 sm:py-4 sm:text-[11px]"
+            className="h-auto px-3.5 py-1.5 text-[8.5px] uppercase tracking-wider min-[380px]:px-4 min-[380px]:py-2 min-[380px]:text-[9.5px] sm:px-9 sm:py-4 sm:text-[11px] sm:tracking-looser"
           >
             Shop Now
           </Button>
+        </div>
 
-          <Link href="/trending" className="inline-block">
-            <span className="nav-link text-[8.5px] text-ink underline decoration-1 underline-offset-4 transition-opacity hover:opacity-75 sm:text-[12px]">
+        {/* Right: EXPLORE NEW IN Link (placed where red marked option was) */}
+        <div>
+          <Link href="/trending" className="inline-flex items-center">
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-ink underline decoration-1 underline-offset-4 transition-opacity hover:opacity-75 min-[380px]:text-[9.5px] sm:text-[12px] sm:tracking-[0.12em]">
               Explore New In
             </span>
           </Link>
-        </div>
-
-        {/* Dynamic Year Stamp */}
-        <div className="text-right">
-          <p className="label-caps text-[7.5px] leading-tight text-ink min-[380px]:text-[8px] sm:text-[11px] sm:leading-relaxed">
-            New
-            <br />
-            Collection
-            <br />
-            {currentYear}
-          </p>
-          <div className="ml-auto mt-1 h-[1.5px] w-5 bg-ink sm:mt-2.5 sm:w-8" />
         </div>
       </div>
     </section>

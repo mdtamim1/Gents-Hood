@@ -1,6 +1,7 @@
 {
   "css.lint.unknownAtRules": "ignore",
   "cSpell.ignorePaths": ["**/*.md"],
+  "cSpell.ignoreRegExpList": ["/[\\u0980-\\u09FF]+/g"],
   "cSpell.words": [
     "Agrabad",
     "Axxxxxx",
@@ -18,18 +19,22 @@
     "Vercel",
     "Wishlisted",
     "Wordmark",
+    "cinzel",
+    "Cinzel",
     "crewneck",
     "cuid",
     "gentshood",
     "nosniff",
+    "nvmp",
     "pgbouncer",
+    "playfair",
+    "Playfair",
     "pooler",
     "rgba",
-    "sitekey",
-    "sslmode",
-    "streetwear",
     "scanline",
     "scanlines",
-    "nvmp"
+    "sitekey",
+    "sslmode",
+    "streetwear"
   ]
 }

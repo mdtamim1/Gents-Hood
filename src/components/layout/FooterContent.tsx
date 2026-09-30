@@ -6,7 +6,6 @@ import {
   FacebookIcon,
   InstagramIcon,
   TikTokIcon,
-  YouTubeIcon,
   WhatsAppIcon,
   MessengerIcon,
 } from '@/components/ui/SocialIcons';
@@ -141,18 +140,7 @@ export function FooterContent({
                   <TikTokIcon className="h-3.5 w-3.5" />
                 </a>
               )}
-              {socialLinks.youtube && (
-                <a
-                  href={socialLinks.youtube}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="YouTube"
-                  aria-label="YouTube"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
-                >
-                  <YouTubeIcon className="h-3.5 w-3.5" />
-                </a>
-              )}
+
               {socialLinks.whatsapp && (
                 <a
                   href={socialLinks.whatsapp}

@@ -36,53 +36,56 @@ export function Header() {
           isScrolled ? 'border-b border-line shadow-sm' : 'border-b border-transparent'
         }`}
       >
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6 sm:h-20 sm:px-10 lg:px-14">
-          {/* Mobile: Hamburger Button */}
-          <div className="flex items-center sm:hidden">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open mobile navigation"
-              className="p-1.5 text-ink transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-90"
-            >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.5"
+        <div className="relative mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6 sm:h-20 sm:px-10 lg:px-14">
+          {/* Left: Mobile Hamburger & Desktop Navigation */}
+          <div className="flex flex-1 items-center justify-start">
+            {/* Mobile: Hamburger Button */}
+            <div className="flex items-center sm:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Open mobile navigation"
+                className="p-1.5 text-ink transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-90"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Desktop Left: Navigation */}
+            <nav aria-label="Main Navigation" className="hidden items-center gap-8 sm:flex">
+              <Link
+                href="/trending"
+                className="nav-link text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
+              >
+                Trending
+              </Link>
+              <Link
+                href="/contact"
+                className="nav-link text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
+              >
+                Contact
+              </Link>
+            </nav>
           </div>
 
-          {/* Desktop Left: Navigation */}
-          <nav aria-label="Main Navigation" className="hidden items-center space-x-8 sm:flex">
-            <Link
-              href="/trending"
-              className="nav-link text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
-            >
-              Trending
-            </Link>
-            <Link
-              href="/contact"
-              className="nav-link text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
-            >
-              Contact
-            </Link>
-          </nav>
-
-          {/* Center: Brand Logo */}
-          <div className="flex items-center justify-center">
+          {/* Center: Brand Logo - Mathematically & Visually Perfect Center on all screens */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
             <Link
               href="/"
               aria-label="Gents Hood Home"
-              className="group flex select-none items-center justify-center py-1 transition-transform duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-95"
+              className="group pointer-events-auto flex select-none items-center justify-center py-1 transition-transform duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-95"
             >
               <div className="relative h-11 w-28 transition-transform duration-200 group-hover:scale-105 sm:h-14 sm:w-36 md:h-16 md:w-40">
                 <Image
@@ -98,7 +101,7 @@ export function Header() {
           </div>
 
           {/* Right: Actions (Track Order, Cart) */}
-          <div className="flex items-center space-x-6 sm:space-x-8">
+          <div className="flex flex-1 items-center justify-end gap-6 sm:gap-8">
             <Link
               href="/track-order"
               className="nav-link hidden items-center text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink sm:flex"
@@ -111,7 +114,7 @@ export function Header() {
               type="button"
               onClick={() => setIsCartOpen(true)}
               aria-label={`Cart with ${isMounted ? cartTotalItems : 0} items`}
-              className="nav-link flex items-center space-x-1.5 text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
+              className="nav-link flex items-center gap-1.5 text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
             >
               <svg
                 className="h-4 w-4"

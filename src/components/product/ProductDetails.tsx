@@ -250,34 +250,31 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         {/* ── RIGHT: Product Details Info Panel (Ultra-Premium Architecture) ── */}
         <div className="flex flex-col gap-0 lg:col-span-6">
           {/* ═══ HERO TITLE & PRICE BLOCK ═══ */}
-          <div className="border-ink/10 border-b-2 pb-6">
-            <h1
-              className="text-3xl font-black uppercase leading-[0.9] tracking-[-0.03em] text-ink sm:text-4xl lg:text-5xl"
-              style={{ fontVariant: 'small-caps' }}
-            >
+          <div className="border-ink/10 border-b-2 pb-5 sm:pb-6">
+            <h1 className="font-cinzel text-xl font-bold uppercase leading-snug tracking-[0.04em] text-ink sm:text-2xl lg:text-3xl">
               {product.name}
             </h1>
 
             {/* Price Row */}
-            <div className="mt-5 flex flex-wrap items-end gap-3">
+            <div className="mt-3.5 flex flex-wrap items-baseline gap-2.5 sm:mt-4 sm:gap-3">
               <span
-                className="text-4xl font-black leading-none text-ink sm:text-5xl"
+                className="font-cinzel text-2xl font-bold tracking-tight text-ink sm:text-3xl"
                 style={{ fontFeatureSettings: '"tnum"' }}
               >
                 {formatPrice(product.price)}
               </span>
               {product.comparePrice && (
-                <span className="text-ink/30 mb-1 font-mono text-lg font-medium line-through">
+                <span className="text-ink/35 font-mono text-sm font-medium line-through sm:text-base">
                   {formatPrice(product.comparePrice)}
                 </span>
               )}
               {discount > 0 && (
                 <span
-                  className="mb-1 px-3 py-1 text-xs font-black uppercase tracking-wider text-white"
+                  className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cream"
                   style={{
-                    background: 'linear-gradient(135deg,#9B1C2A,#E50914)',
-                    boxShadow: '0 4px 14px rgba(229,9,20,0.4)',
-                    letterSpacing: '0.15em',
+                    background: 'linear-gradient(135deg, #4A0E17, #7A1726)',
+                    boxShadow: '0 2px 8px rgba(74,14,23,0.3)',
+                    letterSpacing: '0.12em',
                   }}
                 >
                   SAVE {discount}%

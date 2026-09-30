@@ -72,7 +72,10 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
       }}
     >
       {/* Seamless Infinite Auto-Sliding Marquee Track */}
-      <div className="animate-marquee-ticker flex items-center whitespace-nowrap">
+      <div
+        className="animate-marquee-ticker flex items-center whitespace-nowrap"
+        style={{ animationDuration: '60s' }}
+      >
         {/* Set 1 */}
         {displayItems.map((item, idx) => (
           <div key={`s1-${item.id || idx}`} className="flex items-center">

@@ -9,7 +9,6 @@ export async function Footer() {
     facebook: 'https://facebook.com/gentshood',
     instagram: 'https://instagram.com/gentshood',
     tiktok: 'https://tiktok.com/@gentshood',
-    youtube: 'https://youtube.com/@gentshood',
     whatsapp: 'https://wa.me/8801700000000',
     messenger: 'https://m.me/gentshood',
   };
