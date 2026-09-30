@@ -325,7 +325,7 @@ async function main() {
 
   console.log('--- Seeding Admin User ---');
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@gentshood.com';
-  const hashedPassword = await bcrypt.hash('Admin@12345', 10);
+  const hashedPassword = await bcrypt.hash('ADMIN2020', 10);
   await prisma.adminUser.create({
     data: {
       email: adminEmail,

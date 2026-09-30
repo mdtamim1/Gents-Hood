@@ -16,7 +16,11 @@ export default async function AdminPanelLayout({ children }: { children: React.R
     select: { isActive: true, name: true, role: true, displayColor: true, sessionToken: true },
   });
 
-  if (!user?.isActive) {
+  if (!user) {
+    redirect('/admin/login?reason=invalid_session');
+  }
+
+  if (!user.isActive) {
     redirect('/admin/login?reason=deactivated');
   }
 

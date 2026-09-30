@@ -50,7 +50,7 @@ function AdminLoginForm() {
   const reasonMessage =
     reason === 'deactivated'
       ? 'Your account has been deactivated by an administrator.'
-      : reason === 'session_expired'
+      : reason === 'session_expired' || reason === 'invalid_session'
         ? 'Your session has expired. Please login again.'
         : null;
 
@@ -111,7 +111,7 @@ function AdminLoginForm() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoFocus
-                    placeholder="admin@gentshood.com"
+                    placeholder="Enter your email"
                     className="w-full rounded-xl border border-white/[0.08] bg-[#0f0f11] py-3 pl-10 pr-4 text-[13px] text-white placeholder-white/20 outline-none transition-all focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20"
                   />
                 </div>

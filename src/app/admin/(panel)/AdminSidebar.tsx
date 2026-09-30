@@ -53,11 +53,10 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
       const res = await fetch('/api/admin/auth/me');
       if (!res.ok) {
         const data = await res.json();
-        if (
-          data.error === 'Account deactivated' ||
-          data.error === 'Session expired. Please login again.'
-        ) {
+        if (data.error === 'Account deactivated') {
           router.push('/admin/login?reason=deactivated');
+        } else if (data.error === 'Session expired. Please login again.') {
+          router.push('/admin/login?reason=session_expired');
         }
       }
       setIsOnline(true);
