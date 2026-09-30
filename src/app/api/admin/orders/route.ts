@@ -111,9 +111,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Generate order number
-    const count = await db.order.count();
-    const orderNo = `GH-${String(count + 1001).padStart(5, '0')}`;
+    // Generate or use provided GH order number
+    let orderNo =
+      typeof body.orderNo === 'string' && body.orderNo.trim().startsWith('GH-')
+        ? body.orderNo.trim()
+        : '';
+    if (!orderNo) {
+      const count = await db.order.count();
+      orderNo = `GH-${String(count + 1001).padStart(4, '0')}`;
+    }
+    const existingOrderNo = await db.order.findUnique({ where: { orderNo } });
+    if (existingOrderNo) {
+      orderNo = `GH-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const shopNote =
+      [body.shopNote?.trim(), body.memo ? `[Tx: ${body.memo.trim()}]` : null]
+        .filter(Boolean)
+        .join(' | ') || null;
 
     // Find or create customer
     let customer = null;
@@ -164,7 +179,7 @@ export async function POST(request: NextRequest) {
         shippingArea: body.shippingArea || '',
         shippingAddress: body.shippingAddress || '',
         note: body.note || null,
-        shopNote: body.shopNote || null,
+        shopNote,
         courierName: body.courierName || null,
         isManualOrder: true,
         syncedAt: new Date(), // Manual orders are already "synced"
