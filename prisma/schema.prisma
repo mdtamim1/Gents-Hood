@@ -78,6 +78,8 @@ model SiteSetting {
   deliveryCharges     String?
   heroTagline         String?
   heroBackgroundWord  String?  @default("GENTS HOOD")
+  galleryStripJson    String?
+  trendingBannerJson  String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -113,33 +115,48 @@ model Address {
 }
 
 model Order {
-  id               String               @id @default(cuid())
-  orderNo          String               @unique
-  customerId       String?
-  status           String               @default("PENDING")
-  paymentMethod    String               @default("COD")
-  paymentStatus    String               @default("UNPAID")
-  subtotal         Int
-  deliveryCharge   Int
-  discount         Int                  @default(0)
-  total            Int
-  shippingName     String
-  shippingPhone    String
-  shippingDistrict String
-  shippingArea     String
-  shippingAddress  String
-  note             String?
-  idempotencyKey   String?              @unique
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  orderNo           String               @unique
+  customerId        String?
+  status            String               @default("PENDING")
+  paymentMethod     String               @default("COD")
+  paymentStatus     String               @default("UNPAID")
+  subtotal          Int
+  deliveryCharge    Int
+  discount          Int                  @default(0)
+  manualDiscount    Int                  @default(0)
+  paidAmount        Int                  @default(0)
+  couponCode        String?
+  total             Int
+  shippingName      String
+  shippingPhone     String
+  shippingDistrict  String
+  shippingThana     String               @default("")
+  shippingArea      String
+  shippingAddress   String
+  note              String?
+  shopNote          String?
+  courierName       String?
+  courierTrackingNo String?
+  courierEntryDone  Boolean              @default(false)
+  courierEntryAt    DateTime?
+  isManualOrder     Boolean              @default(false)
+  syncedAt          DateTime?
+  assignedToId      String?
+  idempotencyKey    String?              @unique
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  customer         Customer?            @relation(fields: [customerId], references: [id])
-  items            OrderItem[]
-  statusHistory    OrderStatusHistory[]
+  customer          Customer?            @relation(fields: [customerId], references: [id])
+  assignedTo        AdminUser?           @relation("AssignedOrders", fields: [assignedToId], references: [id])
+  items             OrderItem[]
+  statusHistory     OrderStatusHistory[]
+  activityLogs      OrderActivityLog[]
 
   @@index([orderNo])
   @@index([shippingPhone])
   @@index([status, createdAt])
+  @@index([assignedToId])
 }
 
 model OrderItem {
@@ -164,6 +181,8 @@ model OrderStatusHistory {
   orderId   String
   status    String
   note      String?
+  adminId   String?
+  adminName String?
   createdAt DateTime    @default(now())
 
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -171,13 +190,63 @@ model OrderStatusHistory {
   @@index([orderId])
 }
 
+// New: Detailed activity log per order
+model OrderActivityLog {
+  id         String   @id @default(cuid())
+  orderId    String
+  adminId    String?
+  adminName  String?
+  action     String   // CREATED, ASSIGNED, STATUS_CHANGED, EDITED, COURIER_ENTERED, NOTE_ADDED
+  oldValue   String?
+  newValue   String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([adminId])
+}
+
 model AdminUser {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  role         String    @default("STAFF")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String         @default("Admin")
+  passwordHash   String
+  role           String         @default("STAFF")
+  isActive       Boolean        @default(true)
+  displayColor   String?        @default("#6366f1")
+  permissions    String?        // JSON: { orders, products, customers, settings, analytics }
+  lastLoginAt    DateTime?
+  lastLogoutAt   DateTime?
+  sessionToken   String?        @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  auditLogs      AuditLog[]
+  staffSessions  StaffSession[]
+  assignedOrders Order[]        @relation("AssignedOrders")
+
+  @@index([email])
+  @@index([sessionToken])
+}
+
+// Live session tracking
+model StaffSession {
+  id          String    @id @default(cuid())
+  staffId     String
+  token       String    @unique
+  isActive    Boolean   @default(true)
+  ipAddress   String?
+  userAgent   String?
+  loginAt     DateTime  @default(now())
+  logoutAt    DateTime?
+  lastSeenAt  DateTime  @default(now())
+
+  staff       AdminUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([token])
 }
 
 model AuditLog {
@@ -188,6 +257,8 @@ model AuditLog {
   entityId  String?
   metaJson  String?
   createdAt DateTime @default(now())
+
+  admin     AdminUser @relation(fields: [adminId], references: [id])
 
   @@index([adminId])
   @@index([entity, entityId])

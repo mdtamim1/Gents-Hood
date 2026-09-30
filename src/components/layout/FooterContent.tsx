@@ -1,19 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React from 'react';
+import { ArrowUp, Phone, Mail, MapPin } from 'lucide-react';
 import {
-  ArrowUp,
-  ChevronDown,
-  Phone,
-  Mail,
-  MapPin,
-  MessageSquare,
-  ShieldCheck,
-  Truck,
-  CheckCircle,
-} from 'lucide-react';
-import { NewsletterForm } from './NewsletterForm';
+  FacebookIcon,
+  InstagramIcon,
+  TikTokIcon,
+  YouTubeIcon,
+  WhatsAppIcon,
+  MessengerIcon,
+} from '@/components/ui/SocialIcons';
 
 interface SocialLinks {
   facebook?: string;
@@ -39,12 +35,6 @@ export function FooterContent({
   address = 'Gulshan 2, Dhaka, Bangladesh',
   socialLinks = {},
 }: FooterContentProps) {
-  const [openSection, setOpenSection] = useState<string | null>(null);
-
-  const toggleSection = (section: string) => {
-    setOpenSection((prev) => (prev === section ? null : section));
-  };
-
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -52,325 +42,159 @@ export function FooterContent({
   const cleanWaNumber = (whatsapp || '').replace(/[^\d]/g, '');
 
   return (
-    <footer className="border-muted-inv/20 relative mt-auto w-full overflow-hidden border-t bg-ink pb-12 pt-16 text-cream selection:bg-cream selection:text-ink">
-      {/* 1. Huge Architectural Typography Background Wordmark */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 select-none overflow-hidden text-center">
-        <span className="text-cream/[0.04] block text-[4.5rem] font-black uppercase leading-none tracking-tighter sm:text-[7.5rem] md:text-[10rem] lg:text-[13rem]">
-          GENTS HOOD
-        </span>
+    <footer className="border-cream/15 relative mt-auto w-full overflow-hidden border-t bg-gradient-to-b from-[#141214] via-[#0d0b0d] to-[#070607] pb-12 pt-14 text-cream">
+      {/* Background Giant Typographic Watermark Layer (Two Lines: GENTS / HOOD) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 flex select-none flex-col items-center justify-center overflow-hidden"
+      >
+        <div className="flex w-full select-none flex-col items-center justify-center text-center font-black uppercase tracking-[-0.02em]">
+          <span className="select-none text-[28vw] leading-[0.76] text-white/[0.065] sm:text-[22vw] lg:text-[18vw]">
+            GENTS
+          </span>
+          <span className="select-none text-[28vw] leading-[0.76] text-white/[0.065] sm:text-[22vw] lg:text-[18vw]">
+            HOOD
+          </span>
+        </div>
       </div>
 
-      <div className="relative mx-auto max-w-[1440px] space-y-16 px-6 sm:px-10 lg:px-14">
-        {/* 2. Newsletter Subscription Row */}
-        <div className="border-muted-inv/20 flex flex-col justify-between gap-8 border-b pb-14 lg:flex-row lg:items-center">
-          <div className="max-w-xl space-y-2">
-            <span className="label-caps tracking-widest text-muted-inv">
-              The Hood Editorial Dispatch
-            </span>
-            <h2 className="heading-lg text-cream">Join the Hood</h2>
-            <p className="text-xs leading-relaxed text-muted-inv">
-              Subscribe to receive private capsule drops, bespoke tailoring dispatches, and private
-              invitations to seasonal collection debuts.
-            </p>
-          </div>
-
-          <NewsletterForm />
-        </div>
-
-        {/* 3. Link Columns (Desktop Grid / Mobile Accordion) */}
-        <div className="border-muted-inv/20 grid grid-cols-1 gap-8 border-b pb-14 text-xs md:grid-cols-2 lg:grid-cols-4">
-          {/* Column 1: Shop */}
-          <div className="border-muted-inv/10 border-b pb-4 md:border-none md:pb-0">
-            <button
-              type="button"
-              onClick={() => toggleSection('shop')}
-              className="flex w-full items-center justify-between py-2 text-left md:pointer-events-none md:py-0"
-            >
-              <h3 className="label-caps font-bold text-cream">Shop Collection</h3>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-inv transition-transform md:hidden ${
-                  openSection === 'shop' ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-            <ul
-              className={`mt-4 space-y-3 text-muted-inv ${
-                openSection === 'shop' ? 'block' : 'hidden md:block'
-              }`}
-            >
-              <li>
-                <Link href="/trending" className="transition-colors hover:text-cream">
-                  Best of Gents Hood (Trending)
-                </Link>
-              </li>
-              <li>
-                <Link href="/" className="transition-colors hover:text-cream">
-                  Flagship Overcoat Collection
-                </Link>
-              </li>
-              <li>
-                <Link href="/trending" className="transition-colors hover:text-cream">
-                  Relaxed Fleece & Hoodies
-                </Link>
-              </li>
-              <li>
-                <Link href="/trending" className="transition-colors hover:text-cream">
-                  Architectural Jackets & Blazers
-                </Link>
-              </li>
-              <li>
-                <Link href="/trending" className="transition-colors hover:text-cream">
-                  Tailored Trousers & Cargos
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 2: Assistance */}
-          <div className="border-muted-inv/10 border-b pb-4 md:border-none md:pb-0">
-            <button
-              type="button"
-              onClick={() => toggleSection('help')}
-              className="flex w-full items-center justify-between py-2 text-left md:pointer-events-none md:py-0"
-            >
-              <h3 className="label-caps font-bold text-cream">Customer Assistance</h3>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-inv transition-transform md:hidden ${
-                  openSection === 'help' ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-            <ul
-              className={`mt-4 space-y-3 text-muted-inv ${
-                openSection === 'help' ? 'block' : 'hidden md:block'
-              }`}
-            >
-              <li>
-                <Link href="/track-order" className="transition-colors hover:text-cream">
-                  Track Your Shipment
-                </Link>
-              </li>
-              <li>
-                <Link href="/account" className="transition-colors hover:text-cream">
-                  Customer Portal & Order History
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Direct WhatsApp Concierge
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Exchange & Return Policy (7 Days)
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Atelier Sizing Guide & Fit Advice
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 3: The Atelier */}
-          <div className="border-muted-inv/10 border-b pb-4 md:border-none md:pb-0">
-            <button
-              type="button"
-              onClick={() => toggleSection('atelier')}
-              className="flex w-full items-center justify-between py-2 text-left md:pointer-events-none md:py-0"
-            >
-              <h3 className="label-caps font-bold text-cream">The Atelier</h3>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-inv transition-transform md:hidden ${
-                  openSection === 'atelier' ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-            <ul
-              className={`mt-4 space-y-3 text-muted-inv ${
-                openSection === 'atelier' ? 'block' : 'hidden md:block'
-              }`}
-            >
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Studio Showroom in Gulshan 2
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Craftsmanship & Fabric Standards
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Privacy Policy & Data Security
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-cream">
-                  Terms & Conditions of Service
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/admin/login"
-                  className="text-[10px] uppercase transition-colors hover:text-cream"
-                >
-                  Staff Portal
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Contact & Social Presence */}
+      <div className="relative z-10 mx-auto max-w-[1440px] px-6 sm:px-10 lg:px-14">
+        {/* Support & Social Presence */}
+        <div className="border-cream/15 flex flex-col justify-between gap-8 border-b pb-10 sm:flex-row sm:items-end">
+          {/* Direct Support */}
           <div className="space-y-4">
-            <h3 className="label-caps font-bold text-cream">Direct Support</h3>
+            <h3 className="label-caps font-bold tracking-[0.25em] text-cream">Direct Support</h3>
 
-            <div className="space-y-2.5 text-xs text-muted-inv">
-              <p className="flex items-center gap-2">
+            <div className="text-cream/80 space-y-3 text-xs">
+              <p className="flex items-center gap-2.5">
                 <Phone className="h-3.5 w-3.5 shrink-0 text-cream" />
                 <a
                   href={`tel:${contactPhone}`}
-                  className="font-mono transition-colors hover:text-cream"
+                  className="font-mono transition-colors hover:text-white"
                 >
                   {contactPhone}
                 </a>
               </p>
-              <p className="flex items-center gap-2">
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-cream" />
+              <p className="flex items-center gap-2.5">
+                <WhatsAppIcon className="h-3.5 w-3.5 shrink-0 text-cream" />
                 <a
                   href={`https://wa.me/${cleanWaNumber}?text=Hello%20Gents%20Hood`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="transition-colors hover:text-cream"
+                  className="transition-colors hover:text-white"
                 >
                   WhatsApp: {whatsapp}
                 </a>
               </p>
-              <p className="flex items-center gap-2">
+              <p className="flex items-center gap-2.5">
                 <Mail className="h-3.5 w-3.5 shrink-0 text-cream" />
-                <a href={`mailto:${contactEmail}`} className="transition-colors hover:text-cream">
+                <a href={`mailto:${contactEmail}`} className="transition-colors hover:text-white">
                   {contactEmail}
                 </a>
               </p>
-              <p className="flex items-start gap-2">
+              <p className="flex items-start gap-2.5">
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cream" />
-                <span>{address}</span>
+                <span className="text-cream/90">{address}</span>
               </p>
             </div>
+          </div>
 
-            {/* Social Icons dynamically populated from SiteSetting */}
-            <div className="pt-2">
-              <span className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-muted-inv">
-                Follow The Hood
-              </span>
-              <div className="flex flex-wrap items-center gap-3">
-                {socialLinks.facebook && (
-                  <a
-                    href={socialLinks.facebook}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Facebook"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">fb</span>
-                  </a>
-                )}
-                {socialLinks.instagram && (
-                  <a
-                    href={socialLinks.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Instagram"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">ig</span>
-                  </a>
-                )}
-                {socialLinks.tiktok && (
-                  <a
-                    href={socialLinks.tiktok}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="TikTok"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">tk</span>
-                  </a>
-                )}
-                {socialLinks.youtube && (
-                  <a
-                    href={socialLinks.youtube}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="YouTube"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">yt</span>
-                  </a>
-                )}
-                {socialLinks.whatsapp && (
-                  <a
-                    href={socialLinks.whatsapp}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="WhatsApp"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">wa</span>
-                  </a>
-                )}
-                {socialLinks.messenger && (
-                  <a
-                    href={socialLinks.messenger}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Messenger"
-                    className="bg-cream/10 flex h-8 w-8 items-center justify-center rounded-full text-cream transition-all hover:scale-110 hover:bg-cream hover:text-ink"
-                  >
-                    <span className="font-mono text-xs font-bold">ms</span>
-                  </a>
-                )}
-              </div>
+          {/* Social Presence */}
+          <div className="space-y-3.5">
+            <span className="text-cream/70 block text-[10px] font-bold uppercase tracking-[0.22em]">
+              Follow The Hood
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {socialLinks.facebook && (
+                <a
+                  href={socialLinks.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Facebook"
+                  aria-label="Facebook"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <FacebookIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {socialLinks.instagram && (
+                <a
+                  href={socialLinks.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Instagram"
+                  aria-label="Instagram"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <InstagramIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {socialLinks.tiktok && (
+                <a
+                  href={socialLinks.tiktok}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="TikTok"
+                  aria-label="TikTok"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <TikTokIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {socialLinks.youtube && (
+                <a
+                  href={socialLinks.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="YouTube"
+                  aria-label="YouTube"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <YouTubeIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {socialLinks.whatsapp && (
+                <a
+                  href={socialLinks.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="WhatsApp"
+                  aria-label="WhatsApp"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <WhatsAppIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {socialLinks.messenger && (
+                <a
+                  href={socialLinks.messenger}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Messenger"
+                  aria-label="Messenger"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-cream transition-all duration-300 hover:scale-110 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_15px_rgba(255,255,243,0.2)]"
+                >
+                  <MessengerIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
             </div>
           </div>
         </div>
 
-        {/* 4. Payment Badges & COD Assurance */}
-        <div className="border-muted-inv/20 flex flex-wrap items-center justify-between gap-6 border-b pb-8 text-[11px] text-muted-inv">
-          <div className="flex flex-wrap items-center gap-6">
-            <span className="flex items-center gap-2 font-medium">
-              <ShieldCheck className="h-4 w-4 text-cream" />
-              Cash on Delivery Available
-            </span>
-            <span className="flex items-center gap-2 font-medium">
-              <Truck className="h-4 w-4 text-cream" />
-              Dhaka 48h / Nationwide Delivery
-            </span>
-            <span className="flex items-center gap-2 font-medium">
-              <CheckCircle className="h-4 w-4 text-cream" />
-              Authentic Premium Fabrics
-            </span>
-          </div>
-
-          <div className="text-[10px] uppercase tracking-wider">
-            Crafted for Uncompromised Modern Menswear
-          </div>
-        </div>
-
-        {/* 5. Bottom Copyright & Back to Top */}
-        <div className="flex flex-col items-center justify-between gap-4 text-[10px] uppercase tracking-widest text-muted-inv sm:flex-row">
+        {/* Bottom Copyright & Back to Top */}
+        <div className="text-cream/60 flex flex-col items-center justify-between gap-4 pt-6 text-[10px] uppercase tracking-widest sm:flex-row">
           <p>© {new Date().getFullYear()} GENTS HOOD ATELIER. ALL RIGHTS RESERVED.</p>
           <div className="flex items-center gap-6">
-            <span className="hidden sm:inline-block">Designed with precision by Tamim Labs</span>
+            <span className="text-cream/40 hidden sm:inline-block">
+              Designed with precision by Tamim Labs
+            </span>
             <button
               type="button"
               onClick={scrollToTop}
-              className="border-muted-inv/30 flex items-center gap-1.5 border px-3 py-1.5 text-cream transition-colors hover:border-cream hover:text-cream"
+              className="border-cream/25 bg-cream/[0.04] group flex items-center gap-2 border px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-cream transition-all duration-300 hover:border-cream hover:bg-cream hover:text-[#0d0b0d] hover:shadow-[0_0_20px_rgba(255,255,243,0.15)] active:scale-95"
             >
               <span>Back to Top</span>
-              <ArrowUp className="h-3 w-3" />
+              <ArrowUp className="h-3 w-3 transition-transform duration-200 group-hover:-translate-y-0.5" />
             </button>
           </div>
         </div>

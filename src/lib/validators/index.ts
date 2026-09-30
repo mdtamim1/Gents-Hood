@@ -10,9 +10,11 @@ export const createOrderItemSchema = z.object({
 
 export const createOrderSchema = z.object({
   shippingName: z.string().min(2, 'Full name must be at least 2 characters'),
-  shippingPhone: z
-    .string()
-    .regex(/^(?:\+?88|01)?\d{11}$/, 'Please enter a valid 11-digit Bangladeshi mobile number'),
+  shippingPhone: z.string().refine((val) => {
+    const clean = val.replace(/[^\d]/g, '');
+    const normalized = clean.startsWith('8801') && clean.length === 13 ? clean.slice(2) : clean;
+    return /^01[3-9]\d{8}$/.test(normalized);
+  }, 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX or +8801XXXXXXXXX)'),
   shippingDistrict: z.string().min(2, 'District is required'),
   shippingArea: z.string().min(2, 'Area or Thana is required'),
   shippingAddress: z.string().min(5, 'Full street address is required'),
@@ -49,6 +51,15 @@ export const siteSettingSchema = z.object({
       whatsapp: z.string().optional().or(z.literal('')),
       messenger: z.string().optional().or(z.literal('')),
     })
+    .optional(),
+  galleryStrip: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        title: z.string(),
+        image: z.string(),
+      })
+    )
     .optional(),
 });
 

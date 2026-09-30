@@ -33,6 +33,24 @@ const settingsUpdateSchema = z.object({
       messenger: z.string().optional(),
     })
     .optional(),
+  galleryStrip: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        title: z.string(),
+        image: z.string(),
+      })
+    )
+    .optional(),
+  trendingBanner: z
+    .object({
+      mediaType: z.enum(['image', 'video']).default('image'),
+      imageUrl: z.string().optional(),
+      videoUrl: z.string().optional(),
+      linkUrl: z.string().optional(),
+      buttonText: z.string().optional(),
+    })
+    .optional(),
 });
 
 export async function GET() {
@@ -83,6 +101,8 @@ export async function PUT(request: NextRequest) {
       heroBackgroundWord: data.heroBackgroundWord,
       deliveryCharges: data.deliveryCharges ? JSON.stringify(data.deliveryCharges) : undefined,
       socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
+      galleryStripJson: data.galleryStrip ? JSON.stringify(data.galleryStrip) : undefined,
+      trendingBannerJson: data.trendingBanner ? JSON.stringify(data.trendingBanner) : undefined,
     });
 
     revalidatePath('/');

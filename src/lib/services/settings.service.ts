@@ -8,8 +8,8 @@ export async function getSiteSettings() {
     if (!settings) {
       settings = await db.siteSetting.create({
         data: {
-          announcementText: 'FREE DELIVERY ON ORDERS ABOVE ৳1,999',
-          freeDeliveryMin: 1999,
+          announcementText: null,
+          freeDeliveryMin: 0,
           contactPhone: '+8801700000000',
           contactEmail: 'contact@gentshood.com',
           whatsapp: '+8801700000000',
@@ -40,6 +40,8 @@ export async function updateSiteSettings(data: {
   heroBackgroundWord?: string;
   deliveryCharges?: string;
   socialLinks?: string;
+  galleryStripJson?: string;
+  trendingBannerJson?: string;
 }) {
   const current = await getSiteSettings();
 

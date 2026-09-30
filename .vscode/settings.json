@@ -1,18 +1,35 @@
 {
+  "css.lint.unknownAtRules": "ignore",
+  "cSpell.ignorePaths": ["**/*.md"],
   "cSpell.words": [
+    "Agrabad",
     "Axxxxxx",
     "CAPI",
+    "Crewneck",
+    "GAZU",
     "Gulshan",
     "HSTS",
     "LOADTEST",
+    "Lookbook",
     "PITR",
+    "SAMEORIGIN",
     "Supabase",
+    "Tamim",
     "Vercel",
+    "Wishlisted",
+    "Wordmark",
+    "crewneck",
+    "cuid",
     "gentshood",
+    "nosniff",
     "pgbouncer",
     "pooler",
+    "rgba",
     "sitekey",
     "sslmode",
-    "streetwear"
+    "streetwear",
+    "scanline",
+    "scanlines",
+    "nvmp"
   ]
 }

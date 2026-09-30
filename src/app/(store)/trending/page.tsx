@@ -16,17 +16,12 @@ export default async function TrendingPage() {
 
   return (
     <main className="mx-auto min-h-[70vh] max-w-[1440px] px-6 py-12 sm:px-10 lg:px-14">
-      {/* Page Title & Breadcrumb */}
-      <div className="space-y-2 pb-8">
-        <span className="label-caps text-muted">The Core Collection</span>
-        <h1 className="heading-lg text-ink">Trending Pieces</h1>
-        <p className="max-w-xl text-xs text-muted sm:text-sm">
-          Crafted with uncompromising attention to proportion, drape, and material longevity. Every
-          piece is tailored to elevate your everyday silhouette.
-        </p>
+      {/* Page Title */}
+      <div className="pb-8 text-center sm:pb-12">
+        <h1 className="heading-lg text-center text-ink">Trending Pieces</h1>
       </div>
 
-      {/* Catalog with Interactive Filters & Grid */}
+      {/* 3. Catalog with Interactive Filters & Grid */}
       <TrendingCatalog initialProducts={products} />
     </main>
   );

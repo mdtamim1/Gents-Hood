@@ -9,24 +9,24 @@ interface TrustItem {
 
 const TRUST_ITEMS: TrustItem[] = [
   {
-    icon: <Truck className="h-6 w-6 stroke-[1.25] text-ink" />,
+    icon: <Truck className="h-5 w-5 flex-shrink-0 stroke-[1.25] text-ink sm:h-5 sm:w-5" />,
     title: 'FAST DELIVERY',
-    description: 'Quick & safe delivery nationwide',
+    description: 'Quick & safe delivery',
   },
   {
-    icon: <RotateCcw className="h-6 w-6 stroke-[1.25] text-ink" />,
+    icon: <RotateCcw className="h-5 w-5 flex-shrink-0 stroke-[1.25] text-ink sm:h-5 sm:w-5" />,
     title: 'EASY RETURNS',
-    description: 'Hassle-free within 7 days',
+    description: 'Within 15 days',
   },
   {
-    icon: <ShieldCheck className="h-6 w-6 stroke-[1.25] text-ink" />,
+    icon: <ShieldCheck className="h-5 w-5 flex-shrink-0 stroke-[1.25] text-ink sm:h-5 sm:w-5" />,
     title: 'QUALITY ASSURED',
-    description: 'Best menswear, tailored precision',
+    description: 'Best fashion, best quality',
   },
   {
-    icon: <Lock className="h-6 w-6 stroke-[1.25] text-ink" />,
+    icon: <Lock className="h-5 w-5 flex-shrink-0 stroke-[1.25] text-ink sm:h-5 sm:w-5" />,
     title: 'SECURE PAYMENT',
-    description: 'Cash on delivery across BD',
+    description: '100% secure checkout',
   },
 ];
 
@@ -34,23 +34,20 @@ export function TrustBar() {
   return (
     <section
       aria-label="Trust & Guarantees"
-      className="w-full border-b border-line bg-cream py-12 sm:py-16"
+      className="w-full border-y border-line bg-cream py-4 sm:py-5"
     >
-      <div className="mx-auto max-w-[1440px] px-6 sm:px-10 lg:px-14">
-        <div className="grid grid-cols-2 gap-8 lg:grid-cols-4 lg:gap-12">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-14">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4 sm:gap-6 lg:gap-8">
           {TRUST_ITEMS.map((item) => (
-            <div
-              key={item.title}
-              className="flex flex-col items-start gap-4 sm:flex-row sm:items-center"
-            >
-              <div className="flex-shrink-0 rounded-[1px] border border-line bg-cream-soft p-2.5">
-                {item.icon}
-              </div>
+            <div key={item.title} className="flex items-center gap-2.5 sm:gap-3">
+              {item.icon}
               <div className="min-w-0">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                <h4 className="text-[10px] font-bold uppercase leading-tight tracking-wider text-ink sm:text-xs">
                   {item.title}
-                </h3>
-                <p className="mt-0.5 text-[11px] leading-tight text-muted">{item.description}</p>
+                </h4>
+                <p className="mt-0.5 truncate text-[9px] leading-tight text-muted sm:text-[10px]">
+                  {item.description}
+                </p>
               </div>
             </div>
           ))}

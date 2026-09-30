@@ -118,19 +118,21 @@ export function ContactForm() {
         <Input
           label="Your Name *"
           name="name"
-          placeholder="e.g. Tamim Hossain"
+          placeholder="Enter your full name"
           value={formData.name}
           onChange={handleChange}
           error={errors.name}
+          autoComplete="name"
         />
         <Input
           label="Email Address *"
           type="email"
           name="email"
-          placeholder="e.g. tamim@example.com"
+          placeholder="Enter your email address"
           value={formData.email}
           onChange={handleChange}
           error={errors.email}
+          autoComplete="email"
         />
       </div>
 
@@ -139,15 +141,16 @@ export function ContactForm() {
           label="Mobile Phone (Optional)"
           type="tel"
           name="phone"
-          placeholder="017XXXXXXXX"
+          placeholder="01XXXXXXXXX"
           value={formData.phone}
           onChange={handleChange}
           helperText="For instant WhatsApp or phone follow-up"
+          autoComplete="tel"
         />
         <Input
           label="Subject *"
           name="subject"
-          placeholder="e.g. Sizing Advice / Custom Order"
+          placeholder="Inquiry subject (e.g. Sizing, Custom order)"
           value={formData.subject}
           onChange={handleChange}
           error={errors.subject}

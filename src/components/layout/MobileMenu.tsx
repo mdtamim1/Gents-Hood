@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface MobileMenuProps {
@@ -9,6 +9,31 @@ interface MobileMenuProps {
 }
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const isFirstRender = React.useRef(true);
+
+  // Clean transition driven purely by isOpen
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (isOpen) setIsMounted(true);
+      return;
+    }
+
+    if (isOpen) {
+      setIsMounted(true);
+      setIsClosing(false);
+    } else {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setIsMounted(false);
+        setIsClosing(false);
+      }, 380);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -19,7 +44,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   );
 
   useEffect(() => {
-    if (isOpen) {
+    if (isMounted) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
     } else {
@@ -30,16 +55,15 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isMounted, handleKeyDown]);
 
-  if (!isOpen) return null;
+  if (!isMounted) return null;
 
   const navLinks = [
     { label: 'Home', href: '/' },
     { label: 'Trending', href: '/trending' },
     { label: 'Contact', href: '/contact' },
     { label: 'Track Order', href: '/track-order' },
-    { label: 'Account', href: '/account' },
   ];
 
   return (
@@ -47,51 +71,79 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Mobile Navigation Menu"
-      className="fixed inset-0 z-50 flex flex-col bg-ink text-cream transition-all duration-300 sm:hidden"
+      className="fixed inset-0 z-50 sm:hidden"
     >
-      {/* Top Bar with Logo & Close */}
-      <div className="flex h-16 items-center justify-between border-b border-line-inv px-6">
-        <span className="text-lg font-bold uppercase tracking-[0.2em]">GENTS HOOD</span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close navigation menu"
-          className="p-2 text-cream hover:opacity-75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream"
-        >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="1.5"
+      {/* Dark Blurred Backdrop - tapping closes drawer with smooth fade out */}
+      <div
+        className={`bg-ink/75 duration-380 fixed inset-0 backdrop-blur-sm transition-opacity ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          isClosing ? 'opacity-0' : 'opacity-100'
+        }`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* 3D Mobile Menu Drawer with Opening and Closing Animations */}
+      <aside
+        className={`relative z-10 flex h-full w-[78%] max-w-[320px] flex-col border-r border-white/15 bg-[#4A0E17] text-cream shadow-[16px_0_40px_rgba(0,0,0,0.65)] ${
+          isClosing ? 'animate-drawer-3d-close' : 'animate-drawer-3d'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Bar with Logo & Close */}
+        <div className="flex h-16 items-center justify-between border-b border-white/15 px-6">
+          <span className="text-base font-extrabold uppercase tracking-[0.2em] text-cream">
+            GENTS HOOD
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation menu"
+            className="text-cream/80 flex h-8 w-8 items-center justify-center rounded-full transition-transform duration-200 hover:bg-white/10 hover:text-cream active:scale-90"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Navigation List */}
-      <nav className="flex flex-1 flex-col justify-between overflow-y-auto px-6 py-12">
-        <ul className="space-y-8">
-          {navLinks.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                onClick={onClose}
-                className="block text-2xl font-semibold uppercase tracking-looser transition-colors hover:text-muted-inv focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* Footer info in menu */}
-        <div className="space-y-4 border-t border-line-inv pt-8 text-xs uppercase tracking-widest text-muted-inv">
-          <p>Fashion that moves with you</p>
-          <p className="text-[10px]">© {new Date().getFullYear()} GENTS HOOD</p>
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      </nav>
+
+        {/* Navigation List with 3D Staggered Animation */}
+        <nav className="flex flex-1 flex-col justify-between overflow-y-auto px-6 py-10">
+          <ul className="space-y-6">
+            {navLinks.map((link, idx) => (
+              <li
+                key={link.href}
+                className={isClosing ? undefined : 'animate-nav-item'}
+                style={{ animationDelay: `${idx * 60 + 80}ms` }}
+              >
+                <Link
+                  href={link.href}
+                  onClick={onClose}
+                  className="group flex items-center justify-between py-1 text-xl font-bold uppercase tracking-looser text-cream transition-all duration-200 hover:translate-x-2 hover:text-white"
+                >
+                  <span>{link.label}</span>
+                  <span className="text-cream/40 text-xs transition-transform duration-200 group-hover:translate-x-1 group-hover:text-cream">
+                    →
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Footer info in menu */}
+          <div className="text-cream/70 space-y-3 border-t border-white/15 pt-6 text-xs uppercase tracking-widest">
+            <p className="text-cream/80 text-[11px] font-semibold">Fashion that moves with you</p>
+            <p className="text-cream/50 font-mono text-[10px]">
+              © {new Date().getFullYear()} GENTS HOOD
+            </p>
+          </div>
+        </nav>
+      </aside>
     </div>
   );
 }

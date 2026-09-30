@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter_Tight } from 'next/font/google';
+import { Inter_Tight, Cinzel, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { MetaPixel } from '@/components/analytics/MetaPixel';
 
@@ -8,6 +8,20 @@ const interTight = Inter_Tight({
   display: 'swap',
   variable: '--font-inter-tight',
   weight: ['400', '500', '600', '700', '800'],
+});
+
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-cinzel',
+  weight: ['500', '600', '700', '800', '900'],
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-playfair',
+  weight: ['500', '600', '700', '800', '900'],
 });
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
@@ -89,8 +103,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={interTight.variable}>
-      <body className="font-sans antialiased selection:bg-ink selection:text-cream">
+    <html lang="en" className={`${interTight.variable} ${cinzel.variable} ${playfair.variable}`}>
+      <body className="font-sans antialiased">
         <MetaPixel />
         {children}
       </body>

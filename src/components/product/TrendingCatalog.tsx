@@ -50,20 +50,24 @@ export function TrendingCatalog({ initialProducts }: TrendingCatalogProps) {
           <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
             Size:
           </span>
-          {sizes.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => setSelectedSize(size)}
-              className={`rounded-[1px] border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                selectedSize === size
-                  ? 'border-ink bg-ink text-cream'
-                  : 'border-line bg-cream text-ink hover:border-ink'
-              }`}
-            >
-              {size}
-            </button>
-          ))}
+          {sizes.map((size) => {
+            const isSelected = selectedSize === size;
+            return (
+              <button
+                key={size}
+                type="button"
+                onClick={() => setSelectedSize(size)}
+                className={`group relative overflow-hidden rounded-[1px] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 active:scale-95 ${
+                  isSelected
+                    ? 'animate-gaming-glow border border-[#4A0E17] bg-[#4A0E17] text-cream shadow-[0_0_16px_rgba(74,14,23,0.65)]'
+                    : 'border border-line bg-cream text-ink hover:border-[#4A0E17] hover:text-[#4A0E17] hover:shadow-[0_2px_8px_rgba(74,14,23,0.18)]'
+                }`}
+              >
+                <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                <span className="relative z-10">{size}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Sort & Count */}

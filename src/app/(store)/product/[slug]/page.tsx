@@ -100,29 +100,30 @@ export default async function ProductPage({ params }: ProductPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="mx-auto max-w-[1440px] px-6 py-10 sm:px-10 sm:py-16 lg:px-14">
+      <main className="py-10 sm:py-16">
         {/* Main Product Layout */}
-        <ProductDetails product={product} />
+        <div className="mx-auto max-w-[1440px] px-6 sm:px-10 lg:px-14">
+          <ProductDetails product={product} />
+        </div>
 
         {/* You May Also Like Recommendations */}
         {related.length > 0 && (
-          <section
-            aria-label="Related Recommendations"
-            className="mt-24 border-t border-line pt-16"
-          >
-            <div className="space-y-1 pb-8">
-              <span className="label-caps text-muted">Complete The Silhouette</span>
-              <h3 className="text-xl font-bold uppercase tracking-tight text-ink sm:text-2xl">
-                You May Also Like
-              </h3>
-            </div>
+          <div className="mx-auto max-w-[1440px] px-6 sm:px-10 lg:px-14">
+            <section aria-label="Related Recommendations" className="pt-16 sm:pt-20">
+              <div className="space-y-1 pb-8">
+                <span className="label-caps text-muted">Complete The Silhouette</span>
+                <h3 className="text-xl font-bold uppercase tracking-tight text-ink sm:text-2xl">
+                  You May Also Like
+                </h3>
+              </div>
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-4">
-              {related.map((item) => (
-                <ProductCard key={item.id} product={item} />
-              ))}
-            </div>
-          </section>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-4">
+                {related.map((item) => (
+                  <ProductCard key={item.id} product={item} />
+                ))}
+              </div>
+            </section>
+          </div>
         )}
       </main>
     </>

@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { signAdminToken, ADMIN_COOKIE_NAME } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/services/audit.service';
+import { randomBytes } from 'crypto';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid admin email'),
@@ -46,6 +47,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if account is active
+    if (!user.isActive) {
+      return NextResponse.json(
+        { success: false, error: 'Your account has been deactivated. Contact the administrator.' },
+        { status: 403 }
+      );
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       return NextResponse.json(
@@ -54,11 +63,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique session token
+    const sessionToken = randomBytes(32).toString('hex');
+
+    // Deactivate old sessions
+    await db.staffSession.updateMany({
+      where: { staffId: user.id, isActive: true },
+      data: { isActive: false, logoutAt: new Date() },
+    });
+
+    // Create new session
+    await db.staffSession.create({
+      data: {
+        staffId: user.id,
+        token: sessionToken,
+        isActive: true,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent') || undefined,
+      },
+    });
+
+    // Update user with session token and lastLoginAt
+    await db.adminUser.update({
+      where: { id: user.id },
+      data: {
+        sessionToken,
+        lastLoginAt: new Date(),
+      },
+    });
+
     const role = (user.role === 'OWNER' ? 'OWNER' : 'STAFF') as 'OWNER' | 'STAFF';
     const token = await signAdminToken({
       id: user.id,
       email: user.email,
+      name: user.name,
       role,
+      sessionToken,
     });
 
     await createAuditLog({
@@ -74,6 +114,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         role: user.role,
       },
     });

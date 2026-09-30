@@ -32,7 +32,6 @@ export async function createOrder(input: CreateOrderInput) {
   const settings = await getSiteSettings();
   let insideDhakaFee = 70;
   let outsideDhakaFee = 130;
-  const freeThreshold = settings.freeDeliveryMin || 1999;
 
   if (settings.deliveryCharges) {
     try {
@@ -138,19 +137,18 @@ export async function createOrder(input: CreateOrderInput) {
       });
     }
 
-    // Determine delivery charge
+    // Determine delivery charge (Free shipping completely turned off)
     const isDhaka =
       input.shippingDistrict.toLowerCase().includes('dhaka') ||
       input.shippingArea.toLowerCase().includes('dhaka');
-    let deliveryCharge = isDhaka ? insideDhakaFee : outsideDhakaFee;
-
-    // Free delivery threshold
-    if (subtotal >= freeThreshold) {
-      deliveryCharge = 0;
-    }
+    const deliveryCharge = isDhaka ? insideDhakaFee : outsideDhakaFee;
 
     const total = subtotal + deliveryCharge;
     const orderNo = generateOrderNumber();
+
+    const rawPhone = input.shippingPhone.replace(/[^\d]/g, '');
+    const normalizedPhone =
+      rawPhone.startsWith('8801') && rawPhone.length === 13 ? rawPhone.slice(2) : rawPhone;
 
     // 4. Create Order Record
     const order = await tx.order.create({
@@ -164,7 +162,7 @@ export async function createOrder(input: CreateOrderInput) {
         discount: 0,
         total,
         shippingName: input.shippingName,
-        shippingPhone: input.shippingPhone,
+        shippingPhone: normalizedPhone,
         shippingDistrict: input.shippingDistrict,
         shippingArea: input.shippingArea,
         shippingAddress: input.shippingAddress,

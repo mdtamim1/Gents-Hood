@@ -11,8 +11,7 @@ export default function CartPage() {
   const { items, updateQuantity, removeItem, getSubtotal } = useCartStore();
   const subtotal = getSubtotal();
 
-  const isFreeDelivery = subtotal >= 1999;
-  const estimatedDelivery = isFreeDelivery ? 0 : 70;
+  const estimatedDelivery = 70;
   const total = subtotal + estimatedDelivery;
 
   return (
@@ -125,19 +124,11 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Estimated Shipping</span>
-                <span className="font-semibold">
-                  {isFreeDelivery ? 'FREE' : formatPrice(estimatedDelivery)}
-                </span>
+                <span className="font-semibold">{formatPrice(estimatedDelivery)}</span>
               </div>
-              {isFreeDelivery ? (
-                <p className="text-[10px] tracking-wide text-success">
-                  ✓ Free delivery threshold unlocked!
-                </p>
-              ) : (
-                <p className="text-[10px] tracking-wide text-muted">
-                  Add {formatPrice(1999 - subtotal)} more to qualify for Free Shipping.
-                </p>
-              )}
+              <p className="text-[10px] tracking-wide text-muted">
+                Standard delivery charges apply. Final fee confirmed at checkout.
+              </p>
             </div>
 
             <div className="flex items-baseline justify-between border-t border-line pt-4 text-sm font-bold uppercase tracking-wider">

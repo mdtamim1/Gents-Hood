@@ -18,7 +18,7 @@ export function Badge({
     'inline-flex items-center font-medium uppercase tracking-looser rounded-[1px] select-none';
 
   const variantStyles = {
-    default: 'bg-ink text-cream',
+    default: 'bg-[#4A0E17] text-cream',
     outline: 'border border-line text-ink bg-transparent',
     inv: 'bg-cream text-ink',
     success: 'bg-success/15 text-success border border-success/30',

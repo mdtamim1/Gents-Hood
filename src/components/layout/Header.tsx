@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useCartStore } from '@/store/cart';
 import { MobileMenu } from './MobileMenu';
+import { AnnouncementBar } from './AnnouncementBar';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -41,7 +43,7 @@ export function Header() {
               type="button"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open mobile navigation"
-              className="p-1.5 text-ink hover:opacity-75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink"
+              className="p-1.5 text-ink transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-90"
             >
               <svg
                 className="h-6 w-6"
@@ -79,40 +81,29 @@ export function Header() {
           <div className="flex items-center justify-center">
             <Link
               href="/"
-              className="select-none text-xl font-extrabold uppercase tracking-[0.25em] text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink sm:text-2xl lg:text-[26px]"
+              aria-label="Gents Hood Home"
+              className="group flex select-none items-center justify-center py-1 transition-transform duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink active:scale-95"
             >
-              GENTS HOOD
+              <div className="relative h-11 w-28 transition-transform duration-200 group-hover:scale-105 sm:h-14 sm:w-36 md:h-16 md:w-40">
+                <Image
+                  src="/images/logo.png"
+                  alt="Gents Hood"
+                  fill
+                  priority
+                  className="object-contain"
+                  sizes="(max-width: 640px) 112px, (max-width: 768px) 144px, 160px"
+                />
+              </div>
             </Link>
           </div>
 
-          {/* Right: Actions (Track Order, Account, Cart) */}
+          {/* Right: Actions (Track Order, Cart) */}
           <div className="flex items-center space-x-6 sm:space-x-8">
             <Link
               href="/track-order"
-              className="nav-link hidden items-center text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink lg:flex"
+              className="nav-link hidden items-center text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink sm:flex"
             >
               Track Order
-            </Link>
-
-            <Link
-              href="/account"
-              aria-label="User Account"
-              className="nav-link hidden items-center space-x-1.5 text-ink transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ink sm:flex"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                />
-              </svg>
-              <span>Account</span>
             </Link>
 
             {/* Cart Button */}
@@ -140,6 +131,9 @@ export function Header() {
             </button>
           </div>
         </div>
+
+        {/* Animated Auto-Sliding Announcement Bar */}
+        <AnnouncementBar />
       </header>
 
       {/* Mobile Drawer Navigation */}

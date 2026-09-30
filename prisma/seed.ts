@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log('--- Cleaning existing records ---');
+  await prisma.orderActivityLog.deleteMany({});
   await prisma.orderItem.deleteMany({});
   await prisma.orderStatusHistory.deleteMany({});
   await prisma.order.deleteMany({});
@@ -12,6 +13,8 @@ async function main() {
   await prisma.productImage.deleteMany({});
   await prisma.product.deleteMany({});
   await prisma.siteSetting.deleteMany({});
+  await prisma.staffSession.deleteMany({});
+  await prisma.auditLog.deleteMany({});
   await prisma.adminUser.deleteMany({});
 
   console.log('--- Seeding Main Featured Product ---');
@@ -326,8 +329,18 @@ async function main() {
   await prisma.adminUser.create({
     data: {
       email: adminEmail,
+      name: 'Super Admin',
       passwordHash: hashedPassword,
       role: 'OWNER',
+      isActive: true,
+      displayColor: '#6366f1',
+      permissions: JSON.stringify({
+        orders: true,
+        products: true,
+        customers: true,
+        settings: true,
+        analytics: true,
+      }),
     },
   });
 

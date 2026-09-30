@@ -2,7 +2,8 @@ import React from 'react';
 import { Hero } from '@/components/landing/Hero';
 import { GalleryStrip } from '@/components/landing/GalleryStrip';
 import { FeaturedProduct } from '@/components/landing/FeaturedProduct';
-import { TrustBar } from '@/components/landing/TrustBar';
+import { ProductQualityFAQ } from '@/components/landing/ProductQualityFAQ';
+import { StyleManifestoMarquee } from '@/components/landing/StyleManifestoMarquee';
 import { TrendingGrid } from '@/components/landing/TrendingGrid';
 import { getFeaturedProduct, getTrendingProducts } from '@/lib/services/product.service';
 import { getSiteSettings } from '@/lib/services/settings.service';
@@ -62,6 +63,41 @@ export default async function HomePage() {
     },
   };
 
+  const typedSettings = siteSettings as typeof siteSettings & {
+    galleryStripJson?: string | null;
+    trendingBannerJson?: string | null;
+  };
+  let adminGalleryItems: { id: string; title: string; image: string; alt?: string }[] | undefined =
+    undefined;
+  if (typedSettings?.galleryStripJson) {
+    try {
+      const parsed = JSON.parse(typedSettings.galleryStripJson);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        adminGalleryItems = parsed.map(
+          (item: { id?: string; title?: string; image?: string }, idx: number) => ({
+            id: item.id || String(idx + 1),
+            title: item.title || `Preview ${idx + 1}`,
+            image: item.image || '/images/gallery-front.jpg',
+            alt: item.title,
+          })
+        );
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const galleryItems =
+    adminGalleryItems ||
+    (featuredProduct?.images && featuredProduct.images.length >= 3
+      ? featuredProduct.images.slice(0, 3).map((img, idx) => ({
+          id: img.id,
+          title: idx === 0 ? 'Front View' : idx === 1 ? 'Texture & Detail' : 'Silhouette Fit',
+          image: img.url,
+          alt: img.alt || featuredProduct.name,
+        }))
+      : undefined);
+
   return (
     <>
       {/* Schema.org Structured Data */}
@@ -75,22 +111,25 @@ export default async function HomePage() {
       />
 
       {/* 1. Hero Section (with giant typography & cutout model overlap) */}
-      <Hero />
+      <Hero tagline={siteSettings?.heroTagline} backgroundWord={siteSettings?.heroBackgroundWord} />
 
-      {/* 2. Main Product Gallery Strip (full-width ink band with 3 perspective cards) */}
-      <GalleryStrip />
+      {/* 2. Main Product Gallery Strip (image previews with title and interactive lightbox) */}
+      <GalleryStrip items={galleryItems} />
 
       {/* 3. NEW VIBES Main Product Section (real DB data: pricing, variants, stock) */}
-      <FeaturedProduct
-        initialProduct={featuredProduct}
-        freeDeliveryMin={siteSettings?.freeDeliveryMin || 1999}
+      <FeaturedProduct initialProduct={featuredProduct} />
+
+      {/* 4. BEST OF GENTS HOOD (Curated Collection Banner with link to /trending) */}
+      <TrendingGrid
+        products={trendingProducts}
+        bannerSettings={typedSettings?.trendingBannerJson}
       />
 
-      {/* 4. Trust Bar (4 key service guarantees with line icons) */}
-      <TrustBar />
+      {/* 5. Product Quality & Assurance FAQ (Below Best of Gents Hood) */}
+      <ProductQualityFAQ />
 
-      {/* 5. BEST OF GENTS HOOD (Top 8 Trending grid with wishlist & quick add) */}
-      <TrendingGrid products={trendingProducts} />
+      {/* 6. Style Manifesto Dual Direction Marquee (Directly below FAQ) */}
+      <StyleManifestoMarquee />
     </>
   );
 }

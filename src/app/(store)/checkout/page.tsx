@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { CheckoutForm } from '@/components/checkout/CheckoutForm';
 
@@ -11,7 +11,15 @@ export const metadata: Metadata = {
 export default function CheckoutPage() {
   return (
     <main className="min-h-[80vh]">
-      <CheckoutForm />
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-[1280px] px-6 py-20 text-center text-xs uppercase tracking-widest text-muted">
+            Loading Checkout...
+          </div>
+        }
+      >
+        <CheckoutForm />
+      </Suspense>
     </main>
   );
 }

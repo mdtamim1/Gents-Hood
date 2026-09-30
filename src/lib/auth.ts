@@ -4,7 +4,9 @@ import { SignJWT, jwtVerify } from 'jose';
 export interface AdminSession {
   id: string;
   email: string;
+  name: string;
   role: 'OWNER' | 'STAFF';
+  sessionToken?: string;
 }
 
 export const ADMIN_COOKIE_NAME = 'gh_admin_session';
@@ -31,7 +33,9 @@ export async function verifyAdminToken(token: string): Promise<AdminSession | nu
     return {
       id: payload.id as string,
       email: payload.email as string,
+      name: (payload.name as string) || 'Admin',
       role: payload.role as 'OWNER' | 'STAFF',
+      sessionToken: payload.sessionToken as string | undefined,
     };
   } catch {
     return null;

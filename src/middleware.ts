@@ -13,13 +13,24 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Guard Admin API routes (except login)
-  if (pathname.startsWith('/api/admin') && !pathname.startsWith('/api/admin/auth/login')) {
+  if (
+    pathname.startsWith('/api/admin') &&
+    !pathname.startsWith('/api/admin/auth/login') &&
+    !pathname.startsWith('/api/admin/orders/midnight-reset')
+  ) {
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     try {
-      await jwtVerify(token, getJwtSecret());
+      const { payload } = await jwtVerify(token, getJwtSecret());
+
+      // Check if user is active via the token's role/id
+      // Full session validation happens in individual route handlers
+      if (!payload.id || !payload.role) {
+        return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+      }
+
       return NextResponse.next();
     } catch {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });

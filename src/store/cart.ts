@@ -64,6 +64,7 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'gents-hood-cart',
+      partialize: (state) => ({ items: state.items }),
     }
   )
 );

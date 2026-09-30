@@ -30,6 +30,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter-tight)', 'sans-serif'],
+        cinzel: ['var(--font-cinzel)', 'Cinzel', 'serif'],
+        serif: ['var(--font-playfair)', 'Playfair Display', 'Georgia', 'serif'],
       },
       letterSpacing: {
         widest: '0.28em',
