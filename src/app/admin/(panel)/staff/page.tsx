@@ -1,15 +1,18 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess, getFirstAllowedPath } from '@/lib/permissions';
 import { StaffPageClient } from './StaffPageClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminStaffPage() {
-  const session = await getAdminSession();
-  if (!session) redirect('/admin/login');
-  if (session.role !== 'OWNER') redirect('/admin/dashboard');
+  const auth = await verifyAdminAccess();
+  if (!auth.authorized) redirect('/admin/login');
+  if (auth.user.role !== 'OWNER') {
+    redirect(getFirstAllowedPath(auth.user));
+  }
+  const session = auth.session;
 
   // Get all staff
   const [staff, activeSessions] = await Promise.all([

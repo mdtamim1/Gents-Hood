@@ -14,8 +14,9 @@ import {
   Truck,
   DollarSign,
 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,14 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
 };
 
 export default async function AdminDashboardPage() {
-  const session = await getAdminSession();
+  const auth = await verifyAdminAccess('dashboard');
+  if (!auth.authorized) {
+    if (auth.reason === 'forbidden' && auth.fallbackUrl) {
+      redirect(auth.fallbackUrl);
+    }
+    redirect(`/admin/login?reason=${auth.reason}`);
+  }
+  const session = auth.session;
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -164,7 +172,7 @@ export default async function AdminDashboardPage() {
             sub: 'Registered customers',
             icon: Users,
             color: 'purple',
-            href: '/admin/customers',
+            href: '/admin/orders',
           },
         ].map(({ label, value, sub, icon: Icon, color, href }) => (
           <Link

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +11,14 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(_request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     // Get all pending orders
     const pendingOrders = await db.order.findMany({
@@ -53,8 +57,12 @@ export async function POST(_request: NextRequest) {
     let assignees: Array<{ id: string; name: string }>;
 
     if (uniqueStaff.length === 0) {
-      // No online staff → assign all to admin who clicked sync
-      assignees = [{ id: session.id, name: session.name }];
+      // No online staff → assign all orders directly to the Admin who clicked sync
+      const adminUser = await db.adminUser.findUnique({
+        where: { id: session.id },
+        select: { id: true, name: true },
+      });
+      assignees = [{ id: session.id, name: adminUser?.name || session.name || 'Admin' }];
     } else {
       assignees = uniqueStaff;
     }
@@ -103,7 +111,10 @@ export async function POST(_request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${updatedOrders.length} orders`,
+      message:
+        uniqueStaff.length === 0
+          ? `Synced ${updatedOrders.length} order${updatedOrders.length > 1 ? 's' : ''} directly to Admin Processing (No active staff online)`
+          : `Synced ${updatedOrders.length} order${updatedOrders.length > 1 ? 's' : ''} distributed equally among ${uniqueStaff.length} active staff (${uniqueStaff.map((s) => s.name).join(', ')})`,
       synced: updatedOrders.length,
       assignedTo: assignees.map((a) => a.name),
       noOnlineStaff: uniqueStaff.length === 0,

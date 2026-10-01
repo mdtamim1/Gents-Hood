@@ -15,7 +15,11 @@ import {
   FileText,
   History,
   Check,
+  ShieldAlert,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
+import { AppealFormModal, OrderAppealData } from './AppealFormModal';
 
 interface ActivityLog {
   id: string;
@@ -60,6 +64,15 @@ interface Order {
   courierName?: string | null;
   courierTrackingNo?: string | null;
   assignedTo?: { id: string; name: string; displayColor: string } | null;
+  appealStatus?: string | null;
+  appeals?: Array<{
+    id: string;
+    reason: string;
+    note: string;
+    status: string;
+    staffName: string;
+    createdAt: string;
+  }>;
   items: OrderItem[];
   activityLogs: ActivityLog[];
   createdAt: string;
@@ -98,7 +111,7 @@ interface OrderDetailModalProps {
   orderId: string;
   onClose: () => void;
   onUpdate: () => void;
-  staffList: Array<{ id: string; name: string; displayColor: string }>;
+  staffList: Array<{ id: string; name: string; displayColor: string; isOnline?: boolean }>;
   isOwner: boolean;
 }
 
@@ -119,6 +132,7 @@ export function OrderDetailModal({
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Order>>({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [showAppealModal, setShowAppealModal] = useState(false);
 
   const STATUSES = ['PENDING', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED', 'RETURNED'];
 
@@ -236,11 +250,40 @@ export function OrderDetailModal({
                 >
                   {order.status}
                 </span>
+
+                {/* Appeal Badge */}
+                {order.appealStatus === 'PENDING' && (
+                  <span className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                    <ShieldAlert className="h-3 w-3" />
+                    Appeal Pending
+                  </span>
+                )}
+                {order.appealStatus === 'APPROVED' && (
+                  <span className="flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Appealed
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-white/35">{formatDate(order.createdAt)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Appeal Button */}
+            <button
+              type="button"
+              onClick={() => setShowAppealModal(true)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all ${
+                order.appealStatus === 'PENDING'
+                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                  : 'border-white/[0.1] bg-white/[0.05] text-white/70 hover:bg-white/[0.08] hover:text-white'
+              }`}
+              title={order.appealStatus === 'PENDING' ? 'Appeal is pending review' : 'Submit customer appeal / problem'}
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span>{order.appealStatus === 'PENDING' ? 'In Review' : 'Appeal'}</span>
+            </button>
+
             {/* Status change */}
             <div className="relative">
               <button
@@ -274,6 +317,25 @@ export function OrderDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Pending Appeal Notice */}
+        {order.appealStatus === 'PENDING' && (
+          <div className="flex items-center justify-between border-b border-amber-500/20 bg-amber-500/10 px-6 py-2.5 text-xs text-amber-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+              <span>
+                <strong>Appeal in progress:</strong> This order is currently under Admin verification. Duplicate appeals are blocked.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAppealModal(true)}
+              className="font-semibold underline hover:text-white"
+            >
+              View Appeal
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-white/[0.06]">
@@ -557,21 +619,29 @@ export function OrderDetailModal({
                       ) : (
                         <p className="text-[13px] text-white/30">Not assigned</p>
                       )}
-                      <p className="text-[11px] text-white/30">Reassign to:</p>
+                      <p className="text-[11px] text-white/30">Reassign to (Online Staff only):</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {staffList.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => handleAssign(s.id)}
-                            className="flex items-center gap-1.5 rounded-full border border-white/[0.1] px-2.5 py-1 text-[11px] text-white/50 transition-colors hover:border-white/[0.2] hover:text-white/80"
-                          >
-                            <span
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: s.displayColor }}
-                            />
-                            {s.name}
-                          </button>
-                        ))}
+                        {staffList.filter((s) => s.isOnline).length === 0 ? (
+                          <p className="text-[11px] text-amber-400/80">No online staff available to assign</p>
+                        ) : (
+                          staffList
+                            .filter((s) => s.isOnline)
+                            .map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => handleAssign(s.id)}
+                                className="flex items-center gap-1.5 rounded-full border border-white/[0.1] px-2.5 py-1 text-[11px] text-white/70 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-white"
+                                title={`${s.name} (Online)`}
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: s.displayColor }}
+                                />
+                                {s.name}
+                              </button>
+                            ))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -658,6 +728,18 @@ export function OrderDetailModal({
           )}
         </div>
       </div>
+
+      {showAppealModal && (
+        <AppealFormModal
+          order={order as unknown as OrderAppealData}
+          onClose={() => setShowAppealModal(false)}
+          onSuccess={async () => {
+            setShowAppealModal(false);
+            await loadOrder();
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 }

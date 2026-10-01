@@ -1,16 +1,24 @@
 import React from 'react';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { verifyAdminAccess } from '@/lib/permissions';
 import OrdersPageClient from './OrdersPageClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminOrdersPage() {
-  const session = await getAdminSession();
-  if (!session) redirect('/admin/login');
+  const auth = await verifyAdminAccess('orders');
+  if (!auth.authorized) {
+    if (auth.reason === 'forbidden' && auth.fallbackUrl) {
+      redirect(auth.fallbackUrl);
+    }
+    redirect(`/admin/login?reason=${auth.reason}`);
+  }
+  const session = auth.session;
 
-  // Build where clause based on role
+  // By default, staff sees only their assigned orders.
+  // When staff searches (via API), they can search all orders across the store.
+  // Admin sees all orders.
   const whereClause = session.role !== 'OWNER' ? { assignedToId: session.id } : {};
 
   const [orders, counts, staffList, user] = await Promise.all([
@@ -22,6 +30,7 @@ export default async function AdminOrdersPage() {
         activityLogs: { orderBy: { createdAt: 'desc' }, take: 5 },
         assignedTo: { select: { id: true, name: true, displayColor: true } },
         customer: { select: { id: true, name: true, phone: true } },
+        appeals: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
       take: 300,
@@ -48,15 +57,32 @@ export default async function AdminOrdersPage() {
         byStatus: Object.fromEntries(statusCounts.map((s) => [s.status, s._count.status])),
       };
     })(),
-    // Staff list (owners only, for assignment)
+    // Staff list with live online status (owners only, for assignment & filtering)
     session.role === 'OWNER'
-      ? db.adminUser
-          .findMany({
-            where: { isActive: true },
-            select: { id: true, name: true, displayColor: true },
-            orderBy: { name: 'asc' },
-          })
-          .then((staff) => staff.map((s) => ({ ...s, displayColor: s.displayColor || '#6366f1' })))
+      ? (async () => {
+          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+          const [allStaff, activeSessions] = await Promise.all([
+            db.adminUser.findMany({
+              where: { isActive: true, role: 'STAFF' },
+              select: { id: true, name: true, displayColor: true },
+              orderBy: { name: 'asc' },
+            }),
+            db.staffSession.findMany({
+              where: {
+                isActive: true,
+                lastSeenAt: { gte: fiveMinAgo },
+              },
+              select: { staffId: true },
+            }),
+          ]);
+          const onlineIds = new Set(activeSessions.map((s) => s.staffId));
+          return allStaff.map((s) => ({
+            id: s.id,
+            name: s.name,
+            displayColor: s.displayColor || '#6366f1',
+            isOnline: onlineIds.has(s.id),
+          }));
+        })()
       : Promise.resolve([]),
     // Current user info
     db.adminUser.findUnique({

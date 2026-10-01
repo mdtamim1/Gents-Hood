@@ -123,13 +123,17 @@ export default async function HomePage() {
       <TrendingGrid
         products={trendingProducts}
         bannerSettings={typedSettings?.trendingBannerJson}
+        marqueeText={siteSettings?.trendingMarqueeText}
       />
 
       {/* 5. Product Quality & Assurance FAQ (Below Best of Gents Hood) */}
-      <ProductQualityFAQ />
+      <ProductQualityFAQ faqsJson={siteSettings?.faqJson} />
 
       {/* 6. Style Manifesto Dual Direction Marquee (Directly below FAQ) */}
-      <StyleManifestoMarquee />
+      <StyleManifestoMarquee
+        line1={siteSettings?.manifestoLine1}
+        line2={siteSettings?.manifestoLine2}
+      />
     </>
   );
 }

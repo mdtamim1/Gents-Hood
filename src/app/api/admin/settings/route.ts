@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.service';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/services/audit.service';
 
 export const dynamic = 'force-dynamic';
@@ -51,13 +51,21 @@ const settingsUpdateSchema = z.object({
       buttonText: z.string().optional(),
     })
     .optional(),
+  trendingMarqueeText: z.string().optional(),
+  manifestoLine1: z.string().optional(),
+  manifestoLine2: z.string().optional(),
+  faqJson: z.string().optional(),
+  announcementsJson: z.string().optional(),
 });
 
 export async function GET() {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('settings');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Settings permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
 
     const settings = await getSiteSettings();
@@ -73,10 +81,14 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('settings');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Settings permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     const body = await request.json();
     const result = settingsUpdateSchema.safeParse(body);
@@ -103,6 +115,11 @@ export async function PUT(request: NextRequest) {
       socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
       galleryStripJson: data.galleryStrip ? JSON.stringify(data.galleryStrip) : undefined,
       trendingBannerJson: data.trendingBanner ? JSON.stringify(data.trendingBanner) : undefined,
+      trendingMarqueeText: data.trendingMarqueeText,
+      manifestoLine1: data.manifestoLine1,
+      manifestoLine2: data.manifestoLine2,
+      faqJson: data.faqJson,
+      announcementsJson: data.announcementsJson,
     });
 
     revalidatePath('/');

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Plus,
+  Minus,
   Trash2,
   Search,
   Loader2,
@@ -15,6 +16,8 @@ import {
   AlertCircle,
   Hash,
   Check,
+  History,
+  ArrowRight,
 } from 'lucide-react';
 import { BD_DISTRICTS, getUpazilas } from '@/lib/constants/bd-locations';
 
@@ -22,8 +25,34 @@ interface ProductVariant {
   id: string;
   size: string;
   color: string;
+  colorHex?: string | null;
   stock: number;
   priceOverride?: number | null;
+}
+
+interface ActivityLog {
+  id: string;
+  action: string;
+  adminName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
+function formatHistoryDate(d: string) {
+  try {
+    return new Intl.DateTimeFormat('en-BD', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(d));
+  } catch {
+    return d;
+  }
 }
 
 interface Product {
@@ -144,6 +173,38 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Selected product configuration state (automated color & size)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedQty, setSelectedQty] = useState<number>(1);
+
+  // History modal state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState<ActivityLog[]>(() => {
+    if (editOrder?.activityLogs && Array.isArray(editOrder.activityLogs)) {
+      return editOrder.activityLogs as ActivityLog[];
+    }
+    return [];
+  });
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Fetch full live history logs when history modal opens
+  useEffect(() => {
+    if (showHistoryModal && editOrder?.id) {
+      setLoadingHistory(true);
+      fetch(`/api/admin/orders/${editOrder.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.order?.activityLogs) {
+            setHistoryLogs(data.order.activityLogs);
+          }
+        })
+        .catch((e) => console.error('History fetch error:', e))
+        .finally(() => setLoadingHistory(false));
+    }
+  }, [showHistoryModal, editOrder]);
+
   // Available upazilas for the selected district
   const upazilaList = useMemo(() => {
     return form.shippingDistrict ? getUpazilas(form.shippingDistrict) : [];
@@ -174,38 +235,110 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     return () => clearTimeout(timer);
   }, [productSearch]);
 
-  const addProduct = (product: Product, variant?: ProductVariant) => {
-    const size = variant?.size || 'Standard';
-    const color = variant?.color || 'Default';
-    const price = variant?.priceOverride ?? product.price;
+  // Handle selecting a product from search -> automate color and size selection
+  const handleSelectProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setSelectedQty(1);
+
+    if (product.variants && product.variants.length > 0) {
+      // Find first in-stock variant if possible
+      const firstInStock = product.variants.find((v) => v.stock > 0) || product.variants[0];
+      const initialColor = firstInStock?.color || product.variants[0]?.color || '';
+      setSelectedColor(initialColor);
+
+      // Filter available sizes for this color
+      const matchingVariant =
+        product.variants.find((v) => v.color === initialColor && v.stock > 0) ||
+        product.variants.find((v) => v.color === initialColor) ||
+        firstInStock;
+
+      setSelectedSize(matchingVariant?.size || 'Standard');
+    } else {
+      setSelectedColor('');
+      setSelectedSize('Standard');
+    }
+  };
+
+  // When color is changed, auto-select size from available in-stock sizes for that color
+  const handleColorChange = (newColor: string) => {
+    setSelectedColor(newColor);
+    if (!selectedProduct?.variants) return;
+
+    const variantsForColor = selectedProduct.variants.filter((v) => v.color === newColor);
+    const sameSizeInStock = variantsForColor.find((v) => v.size === selectedSize && v.stock > 0);
+    if (!sameSizeInStock) {
+      const firstInStock = variantsForColor.find((v) => v.stock > 0);
+      setSelectedSize(firstInStock?.size || variantsForColor[0]?.size || 'Standard');
+    }
+    setSelectedQty(1);
+  };
+
+  // Unique available colors for selected product
+  const availableColors = useMemo(() => {
+    if (!selectedProduct?.variants) return [];
+    return Array.from(new Set(selectedProduct.variants.map((v) => v.color).filter(Boolean)));
+  }, [selectedProduct]);
+
+  // Available variants for selected color
+  const variantsForCurrentColor = useMemo(() => {
+    if (!selectedProduct?.variants) return [];
+    if (!selectedColor) return selectedProduct.variants;
+    return selectedProduct.variants.filter((v) => v.color === selectedColor);
+  }, [selectedProduct, selectedColor]);
+
+  // Current active variant matching color + size
+  const activeVariant = useMemo(() => {
+    if (!selectedProduct?.variants || selectedProduct.variants.length === 0) return null;
+    return (
+      variantsForCurrentColor.find((v) => v.size === selectedSize) ||
+      variantsForCurrentColor[0] ||
+      null
+    );
+  }, [selectedProduct?.variants, variantsForCurrentColor, selectedSize]);
+
+  const activePrice = activeVariant?.priceOverride ?? selectedProduct?.price ?? 0;
+  const activeStock = activeVariant ? activeVariant.stock : 999;
+  const isOutOfStock = activeVariant ? activeVariant.stock <= 0 : false;
+
+  const handleAddConfiguredProduct = () => {
+    if (!selectedProduct) return;
+    if (isOutOfStock) return;
+
+    const size = selectedSize || 'Standard';
+    const color = selectedColor || 'Default';
+    const price = activePrice;
+    const qty = Math.max(1, selectedQty);
 
     const existingIdx = items.findIndex(
       (i) =>
-        i.productId === product.id &&
-        i.variantId === variant?.id &&
+        i.productId === selectedProduct.id &&
+        i.variantId === activeVariant?.id &&
         i.sizeSnapshot === size &&
         i.colorSnapshot === color
     );
 
     if (existingIdx >= 0) {
       const updated = [...items];
-      updated[existingIdx].qty += 1;
+      updated[existingIdx].qty += qty;
       setItems(updated);
     } else {
       setItems((prev) => [
         ...prev,
         {
-          productId: product.id,
-          variantId: variant?.id,
-          nameSnapshot: product.name,
+          productId: selectedProduct.id,
+          variantId: activeVariant?.id,
+          nameSnapshot: selectedProduct.name,
           sizeSnapshot: size,
           colorSnapshot: color,
           priceSnapshot: price,
-          qty: 1,
-          imageSnapshot: product.images?.[0]?.url,
+          qty: qty,
+          imageSnapshot: selectedProduct.images?.[0]?.url,
         },
       ]);
     }
+
+    // Reset configurator and search
+    setSelectedProduct(null);
     setProductSearch('');
     setSearchResults([]);
   };
@@ -287,7 +420,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
           couponCode: form.couponCode,
           subtotal,
           total,
-          items: editOrder ? undefined : items,
+          items: items,
         }),
       });
 
@@ -620,7 +753,10 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                     <input
                       type="text"
                       value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
+                      onChange={(e) => {
+                        setProductSearch(e.target.value);
+                        if (selectedProduct) setSelectedProduct(null);
+                      }}
                       placeholder="Search product name..."
                       className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-8 text-xs text-white placeholder-zinc-500 outline-none focus:border-zinc-500"
                     />
@@ -629,69 +765,236 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                     )}
                   </div>
 
-                  {/* Dropdown Results with Variants (Size & Color) */}
-                  {searchResults.length > 0 && (
-                    <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#131315] shadow-lg">
-                      {searchResults.map((product) => (
-                        <div
-                          key={product.id}
-                          className="border-b border-white/[0.04] p-2.5 last:border-0 hover:bg-white/[0.02]"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            {product.images?.[0] ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={product.images[0].url}
-                                alt={product.name}
-                                className="h-9 w-9 rounded-md border border-white/10 object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-800 text-[9px] text-zinc-500">
-                                No Img
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold text-white">
-                                {product.name}
-                              </p>
-                              <p className="text-[11px] font-medium text-amber-400">
-                                ৳{product.price}
-                              </p>
-                            </div>
-                          </div>
+                  {/* Dropdown Search Results */}
+                  {searchResults.length > 0 && !selectedProduct && (
+                    <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#131315] shadow-xl">
+                      {searchResults.map((product) => {
+                        const colorsCount = new Set(
+                          product.variants?.map((v) => v.color).filter(Boolean)
+                        ).size;
+                        const sizesCount = new Set(
+                          product.variants?.map((v) => v.size).filter(Boolean)
+                        ).size;
 
-                          {/* Variants selection with Color and Size */}
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {product.variants && product.variants.length > 0 ? (
-                              product.variants.map((v) => (
+                        return (
+                          <div
+                            key={product.id}
+                            onClick={() => handleSelectProduct(product)}
+                            className="flex cursor-pointer items-center justify-between border-b border-white/[0.04] p-2.5 transition-colors hover:bg-white/[0.04] last:border-0"
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {product.images?.[0] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={product.images[0].url}
+                                  alt={product.name}
+                                  className="h-10 w-10 shrink-0 rounded-md border border-white/10 object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-800 text-[9px] text-zinc-500">
+                                  No Img
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-semibold text-white">
+                                  {product.name}
+                                </p>
+                                <div className="mt-0.5 flex items-center gap-2 text-[11px]">
+                                  <span className="font-semibold text-amber-400">
+                                    ৳{product.price}
+                                  </span>
+                                  {product.variants && product.variants.length > 0 && (
+                                    <span className="text-[10px] text-zinc-400">
+                                      {colorsCount > 0 &&
+                                        `${colorsCount} ${colorsCount === 1 ? 'color' : 'colors'} · `}
+                                      {sizesCount > 0 &&
+                                        `${sizesCount} ${sizesCount === 1 ? 'size' : 'sizes'}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectProduct(product);
+                              }}
+                              className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300 transition-all hover:bg-amber-500/20"
+                            >
+                              Select
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* AUTOMATED PRODUCT CONFIGURATOR PANEL */}
+                  {selectedProduct && (
+                    <div className="mt-3 rounded-xl border border-amber-500/30 bg-[#161619] p-3.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                      {/* Product Header */}
+                      <div className="flex items-start justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          {selectedProduct.images?.[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={selectedProduct.images[0].url}
+                              alt={selectedProduct.name}
+                              className="h-10 w-10 shrink-0 rounded-md border border-white/10 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-800 text-[9px] text-zinc-500">
+                              No Img
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="line-clamp-1 text-xs font-bold text-white">
+                              {selectedProduct.name}
+                            </h4>
+                            <p className="text-[11px] font-mono text-amber-400">
+                              ৳{activePrice.toLocaleString()}{' '}
+                              <span className="text-[10px] text-zinc-400">
+                                ({isOutOfStock ? 'Out of stock' : `${activeStock} available`})
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProduct(null)}
+                          className="rounded p-1 text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                          title="Change Product"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Automated Color Selection */}
+                      {availableColors.length > 0 && (
+                        <div className="mt-3">
+                          <label className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            <span>Available Colors</span>
+                            <span className="capitalize text-amber-400">{selectedColor}</span>
+                          </label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {availableColors.map((color) => {
+                              const isSelected = selectedColor === color;
+                              const colorHasStock = selectedProduct.variants.some(
+                                (v) => v.color === color && v.stock > 0
+                              );
+                              return (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => handleColorChange(color)}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                                    isSelected
+                                      ? 'border-amber-400 bg-amber-400/10 font-bold text-white shadow-sm'
+                                      : 'border-white/[0.08] bg-[#1a1a1e] text-zinc-300 hover:border-zinc-400'
+                                  }`}
+                                >
+                                  <span
+                                    className={`h-2 w-2 rounded-full ${
+                                      isSelected ? 'bg-amber-400' : 'bg-zinc-500'
+                                    }`}
+                                  />
+                                  <span>{color}</span>
+                                  {!colorHasStock && (
+                                    <span className="text-[9px] text-red-400">(Out)</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Automated Size Selection (filtered for selected color) */}
+                      {variantsForCurrentColor.length > 0 && (
+                        <div className="mt-3">
+                          <label className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            <span>Available Sizes</span>
+                            <span className="font-bold text-amber-400">{selectedSize}</span>
+                          </label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {variantsForCurrentColor.map((v) => {
+                              const isSelected = selectedSize === v.size;
+                              const inStock = v.stock > 0;
+                              return (
                                 <button
                                   key={v.id}
                                   type="button"
-                                  onClick={() => addProduct(product, v)}
-                                  disabled={v.stock === 0}
-                                  className="flex items-center gap-1 rounded border border-white/[0.1] bg-[#1a1a1e] px-2 py-1 text-[10px] text-zinc-300 transition-colors hover:border-zinc-400 hover:text-white disabled:opacity-30"
+                                  disabled={!inStock}
+                                  onClick={() => {
+                                    setSelectedSize(v.size);
+                                    setSelectedQty(1);
+                                  }}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-all ${
+                                    isSelected
+                                      ? 'border-amber-400 bg-amber-400/10 font-bold text-white shadow-sm'
+                                      : inStock
+                                        ? 'border-white/[0.08] bg-[#1a1a1e] text-zinc-300 hover:border-zinc-400'
+                                        : 'cursor-not-allowed border-white/[0.04] bg-white/[0.01] text-zinc-600 line-through'
+                                  }`}
                                 >
                                   <span>{v.size}</span>
-                                  {v.color && (
-                                    <span className="text-[9px] text-zinc-400">({v.color})</span>
-                                  )}
-                                  <span className="font-mono text-[9px] text-zinc-500">
+                                  <span
+                                    className={`font-mono text-[10px] ${
+                                      inStock ? 'text-zinc-400' : 'text-zinc-600'
+                                    }`}
+                                  >
                                     [{v.stock}]
                                   </span>
                                 </button>
-                              ))
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => addProduct(product)}
-                                className="rounded border border-white/[0.1] bg-[#1a1a1e] px-2.5 py-1 text-[10px] font-medium text-zinc-300 hover:border-zinc-400 hover:text-white"
-                              >
-                                + Add Default
-                              </button>
-                            )}
+                              );
+                            })}
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Quantity & Add Action Row */}
+                      <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3">
+                        {/* Quantity Counter */}
+                        <div className="flex items-center rounded-lg border border-white/[0.08] bg-[#1a1a1e] p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQty((q) => Math.max(1, q - 1))}
+                            disabled={selectedQty <= 1 || isOutOfStock}
+                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="w-8 text-center font-mono text-xs font-bold text-white">
+                            {selectedQty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQty((q) => Math.min(activeStock, q + 1))}
+                            disabled={selectedQty >= activeStock || isOutOfStock}
+                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Add Button */}
+                        <button
+                          type="button"
+                          onClick={handleAddConfiguredProduct}
+                          disabled={isOutOfStock}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-zinc-950 shadow-md transition-all hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                          <span>
+                            {isOutOfStock
+                              ? 'Out of Stock'
+                              : `Add to Order · ৳${(activePrice * selectedQty).toLocaleString()}`}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -939,12 +1242,26 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
 
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-white/[0.06] bg-[#17171a] px-6 py-4">
-              <div className="text-xs font-medium text-zinc-400">
-                <span>
-                  {items.length} {items.length === 1 ? 'item' : 'items'}
-                </span>
-                <span className="mx-1.5 text-zinc-600">·</span>
-                <span>Total ৳{total.toLocaleString()}</span>
+              <div className="flex items-center gap-3">
+                {editOrder && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistoryModal(true)}
+                    className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3.5 py-2 text-xs font-semibold text-purple-300 transition-all hover:border-purple-500/50 hover:bg-purple-500/20 active:scale-95"
+                    title="View order activity history"
+                  >
+                    <History className="h-3.5 w-3.5 text-purple-400" />
+                    <span>Order History</span>
+                  </button>
+                )}
+
+                <div className="text-xs font-medium text-zinc-400">
+                  <span>
+                    {items.length} {items.length === 1 ? 'item' : 'items'}
+                  </span>
+                  <span className="mx-1.5 text-zinc-600">·</span>
+                  <span>Total ৳{total.toLocaleString()}</span>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -974,6 +1291,129 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
           </form>
         </div>
       </div>
+
+      {/* ORDER HISTORY SUB-MODAL */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowHistoryModal(false)}
+          />
+          <div className="relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-white/[0.1] bg-[#141416] text-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
+                  <History className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Order Activity History</h3>
+                  <p className="text-[11px] font-mono text-zinc-400">Invoice: {invoiceNo}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 space-y-3 overflow-y-auto p-5">
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
+                  <Loader2 className="mb-2 h-6 w-6 animate-spin text-purple-400" />
+                  <span className="text-xs">Loading activity logs...</span>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-500">
+                  <History className="mb-2 h-8 w-8 stroke-[1.5] text-zinc-600" />
+                  <p className="text-xs font-semibold text-zinc-400">No activity recorded yet</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">
+                    Changes and actions will appear here in chronological order.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyLogs.map((log, idx) => (
+                    <div
+                      key={log.id || idx}
+                      className="flex gap-3 rounded-xl border border-white/[0.06] bg-[#18181c] p-3 text-xs"
+                    >
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/10 font-mono text-[10px] font-bold text-purple-400">
+                        {idx + 1}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              log.action === 'EDITED'
+                                ? 'border-amber-500/30 bg-amber-500/15 text-amber-300'
+                                : log.action === 'STATUS_CHANGED'
+                                  ? 'border-sky-500/30 bg-sky-500/15 text-sky-300'
+                                  : log.action === 'CREATED'
+                                    ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                                    : log.action === 'ASSIGNED'
+                                      ? 'border-purple-500/30 bg-purple-500/15 text-purple-300'
+                                      : 'border-white/10 bg-white/[0.06] text-zinc-300'
+                            }`}
+                          >
+                            {log.action.replace('_', ' ')}
+                          </span>
+                          <span className="font-mono text-[10px] text-zinc-500">
+                            {formatHistoryDate(log.createdAt)}
+                          </span>
+                        </div>
+                        {log.adminName && (
+                          <p className="text-[11px] text-zinc-400">
+                            Action by:{' '}
+                            <span className="font-semibold text-zinc-200">{log.adminName}</span>
+                          </p>
+                        )}
+                        {(log.oldValue || log.newValue) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px]">
+                            {log.oldValue && (
+                              <span className="rounded bg-rose-500/10 px-2 py-0.5 font-medium text-rose-300 line-through decoration-rose-400/60">
+                                {log.oldValue}
+                              </span>
+                            )}
+                            {log.oldValue && log.newValue && (
+                              <ArrowRight className="h-3 w-3 shrink-0 text-zinc-500" />
+                            )}
+                            {log.newValue && (
+                              <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-300">
+                                {log.newValue}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {log.note && (
+                          <p className="text-[11px] text-zinc-300/80">
+                            &ldquo;{log.note}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/[0.08] bg-[#18181b] px-5 py-3 text-right">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="rounded-lg bg-zinc-800 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

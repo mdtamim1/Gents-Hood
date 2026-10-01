@@ -684,8 +684,8 @@ export function FeaturedProduct({ initialProduct }: FeaturedProductProps) {
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: 'Cut & Drape', value: 'Relaxed Drop Shoulder', icon: '↗' },
-                      { label: 'Hardware', value: 'Concealed Storm Placket', icon: '⚙' },
+                      { label: 'Cut & Drape', value: initialProduct?.cutDrape || 'Relaxed Drop Shoulder', icon: '↗' },
+                      { label: 'Hardware', value: initialProduct?.hardware || 'Concealed Storm Placket', icon: '⚙' },
                     ].map(({ label, value, icon }) => (
                       <div
                         key={label}
@@ -808,7 +808,7 @@ export function FeaturedProduct({ initialProduct }: FeaturedProductProps) {
                         boxShadow: '0 4px 10px rgba(74,14,23,0.3)',
                       }}
                     >
-                      True to Size
+                      {initialProduct?.fitBadge || 'True to Size'}
                     </span>
                   </div>
                   <p className="text-ink/60 mb-4 text-xs leading-[1.9]">

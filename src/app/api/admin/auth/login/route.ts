@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { signAdminToken, ADMIN_COOKIE_NAME } from '@/lib/auth';
+import { getFirstAllowedPath } from '@/lib/permissions';
 import { rateLimit } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/services/audit.service';
 import { randomBytes } from 'crypto';
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
+      redirectUrl: getFirstAllowedPath(user),
       user: {
         id: user.id,
         email: user.email,

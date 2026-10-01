@@ -52,8 +52,24 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // If on login page and already logged in -> go to dashboard
+    // If on login page
     if (isLoginPage) {
+      // If there's an error/invalidation reason, clear the stale cookie to prevent redirect loops
+      if (request.nextUrl.searchParams.has('reason') || !isAuthenticated) {
+        const response = NextResponse.next();
+        if (token) {
+          response.cookies.delete(ADMIN_COOKIE_NAME);
+          response.cookies.set({
+            name: ADMIN_COOKIE_NAME,
+            value: '',
+            path: '/',
+            maxAge: 0,
+          });
+        }
+        return response;
+      }
+
+      // If authenticated and no reason given, go to dashboard
       if (isAuthenticated) {
         return NextResponse.redirect(new URL('/admin/dashboard', request.url));
       }

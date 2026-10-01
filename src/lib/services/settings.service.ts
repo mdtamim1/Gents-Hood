@@ -29,7 +29,7 @@ export async function getSiteSettings() {
 }
 
 export async function updateSiteSettings(data: {
-  featuredProductId?: string;
+  featuredProductId?: string | null;
   announcementText?: string;
   freeDeliveryMin?: number;
   contactPhone?: string;
@@ -42,6 +42,11 @@ export async function updateSiteSettings(data: {
   socialLinks?: string;
   galleryStripJson?: string;
   trendingBannerJson?: string;
+  trendingMarqueeText?: string;
+  manifestoLine1?: string;
+  manifestoLine2?: string;
+  faqJson?: string;
+  announcementsJson?: string;
 }) {
   const current = await getSiteSettings();
 

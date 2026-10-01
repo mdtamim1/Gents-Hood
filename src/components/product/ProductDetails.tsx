@@ -70,6 +70,27 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
 
+  // Build colorHex → image index map (from gallery images that have colorHex set)
+  const colorImageMap = useMemo(() => {
+    const map = new Map<string, number>();
+    (product.images || []).forEach((img, idx) => {
+      if ((img as { colorHex?: string | null }).colorHex) {
+        map.set((img as { colorHex?: string | null }).colorHex!, idx);
+      }
+    });
+    return map;
+  }, [product.images]);
+
+  // When color changes, switch to matched image if color-image mapping exists
+  const handleColorSelect = (colorName: string, colorHex: string) => {
+    setSelectedColor(colorName);
+    setSelectedSize('');
+    const mappedIdx = colorImageMap.get(colorHex);
+    if (mappedIdx !== undefined) {
+      setActiveImageIndex(mappedIdx);
+    }
+  };
+
   // Selected variant for stock check
   const activeVariant = useMemo(() => {
     return product.variants?.find((v) => v.color === selectedColor && v.size === selectedSize);
@@ -165,6 +186,21 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     setTimeout(() => router.push('/checkout'), 300);
   };
 
+  // ─── Thumbnail scroll helpers ───
+  const thumbnailScrollRef = useRef<HTMLDivElement>(null);
+  const thumbnailTouchStartX = useRef<number | null>(null);
+
+  const handleThumbTouchStart = (e: React.TouchEvent) => {
+    thumbnailTouchStartX.current = e.touches[0].clientX;
+  };
+  const handleThumbTouchEnd = (e: React.TouchEvent) => {
+    if (thumbnailTouchStartX.current === null || !thumbnailScrollRef.current) return;
+    const diff = thumbnailTouchStartX.current - e.changedTouches[0].clientX;
+    thumbnailScrollRef.current.scrollBy({ left: diff, behavior: 'smooth' });
+    thumbnailTouchStartX.current = null;
+  };
+
+  // ─── Derived ───
   const images =
     product.images && product.images.length > 0
       ? product.images
@@ -182,12 +218,18 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-14">
         {/* ── LEFT: Sticky Gallery (Vertical Thumbnails + Interactive Zoom Canvas) ── */}
         <div className="flex flex-col-reverse gap-3 sm:flex-row lg:sticky lg:top-24 lg:col-span-6">
-          {/* Thumbnails */}
+          {/* Thumbnails — scrollable strip */}
           {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 sm:flex-col sm:overflow-visible sm:pb-0">
+            <div
+              ref={thumbnailScrollRef}
+              onTouchStart={handleThumbTouchStart}
+              onTouchEnd={handleThumbTouchEnd}
+              className="flex gap-2 overflow-x-auto pb-2 sm:flex-col sm:overflow-y-auto sm:overflow-x-hidden sm:pb-0"
+              style={{ scrollbarWidth: 'none', maxHeight: 'calc(4 * 84px + 3 * 8px)' }}
+            >
               {images.map((img, idx) => (
                 <button
-                  key={img.id}
+                  key={img.id || idx}
                   type="button"
                   onClick={() => setActiveImageIndex(idx)}
                   aria-label={`View perspective ${idx + 1}`}
@@ -199,11 +241,18 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 >
                   <Image
                     src={img.url}
-                    alt={img.alt || product.name}
+                    alt={(img as { alt?: string }).alt || product.name}
                     fill
                     sizes="80px"
                     className="object-cover"
                   />
+                  {/* Color dot indicator if image has colorHex */}
+                  {(img as { colorHex?: string | null }).colorHex && (
+                    <span
+                      className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border border-white/40 shadow"
+                      style={{ backgroundColor: (img as { colorHex?: string | null }).colorHex! }}
+                    />
+                  )}
                 </button>
               ))}
             </div>
@@ -298,7 +347,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => setSelectedColor(c.name)}
+                    onClick={() => handleColorSelect(c.name, c.hex)}
                     aria-label={`Select ${c.name}`}
                     className="group flex flex-col items-center gap-1.5 transition-all duration-200"
                   >
@@ -708,8 +757,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Cut & Drape', value: 'Relaxed Drop Shoulder', icon: '↗' },
-                    { label: 'Hardware', value: 'Concealed Heavy Placket', icon: '⚙' },
+                    { label: 'Cut & Drape', value: product.cutDrape || 'Relaxed Drop Shoulder', icon: '↗' },
+                    { label: 'Hardware', value: product.hardware || 'Concealed Heavy Placket', icon: '⚙' },
                   ].map(({ label, value, icon }) => (
                     <div
                       key={label}
@@ -832,7 +881,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                       boxShadow: '0 4px 10px rgba(74,14,23,0.3)',
                     }}
                   >
-                    True to Size
+                    {product.fitBadge || 'True to Size'}
                   </span>
                 </div>
                 <p className="text-ink/60 mb-4 text-xs leading-[1.9]">

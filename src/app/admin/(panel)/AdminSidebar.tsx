@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Shirt,
   ShoppingBag,
-  Users,
   Settings,
   LogOut,
   Menu,
@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Wifi,
   WifiOff,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -27,17 +28,24 @@ interface AdminSidebarProps {
     name: string;
     role: 'OWNER' | 'STAFF';
     displayColor: string;
+    permissions?: Record<string, boolean>;
   };
 }
 
-const NAV_LINKS = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, ownerOnly: false },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingBag, ownerOnly: false },
-  { href: '/admin/products', label: 'Products', icon: Shirt, ownerOnly: false },
-  { href: '/admin/customers', label: 'Customers', icon: Users, ownerOnly: false },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, ownerOnly: false },
+const NAV_LINKS: Array<{
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permissionKey?: string;
+  ownerOnly: boolean;
+}> = [
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissionKey: 'dashboard', ownerOnly: false },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingBag, permissionKey: 'orders', ownerOnly: false },
+  { href: '/admin/appeals', label: 'Appeals', icon: ShieldAlert, permissionKey: 'orders', ownerOnly: false },
+  { href: '/admin/products', label: 'Products', icon: Shirt, permissionKey: 'products', ownerOnly: false },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, permissionKey: 'analytics', ownerOnly: false },
   { href: '/admin/staff', label: 'Staff', icon: UserCheck, ownerOnly: true },
-  { href: '/admin/site-settings', label: 'Settings', icon: Settings, ownerOnly: false },
+  { href: '/admin/site-settings', label: 'Settings', icon: Settings, permissionKey: 'settings', ownerOnly: false },
 ];
 
 export function AdminSidebar({ session }: AdminSidebarProps) {
@@ -92,19 +100,37 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
       .toUpperCase()
       .slice(0, 2);
 
-  const visibleLinks = NAV_LINKS.filter((link) => !link.ownerOnly || session.role === 'OWNER');
+  const visibleLinks = NAV_LINKS.filter((link) => {
+    if (session.role === 'OWNER') return true;
+    if (link.ownerOnly) return false;
+    if (link.permissionKey) {
+      return !!session.permissions?.[link.permissionKey];
+    }
+    return false;
+  });
+
+  const homeHref =
+    session.role === 'OWNER' || session.permissions?.dashboard
+      ? '/admin/dashboard'
+      : (visibleLinks[0]?.href || '/admin/orders');
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="border-b border-white/[0.06] px-6 py-5">
-        <Link href="/admin/dashboard" className="block">
+        <Link href={homeHref} className="block">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-[11px] font-black text-white shadow-lg shadow-indigo-500/25">
-              GH
+            <div className="relative flex h-10 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-1 shadow-md shadow-black/40">
+              <Image
+                src="/images/logo.png"
+                alt="Gents Hood"
+                fill
+                className="object-contain p-0.5"
+                priority
+              />
             </div>
             <div>
-              <p className="text-[13px] font-semibold tracking-wide text-white">GENTS HOOD</p>
+              <p className="text-[13px] font-bold tracking-wide text-white">GENTS HOOD</p>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/40">
                 Admin Console
               </p>
@@ -197,12 +223,17 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
     <>
       {/* Mobile Top Bar */}
       <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[#0a0a0b] px-4 lg:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px] font-black text-white">
-            GH
+        <Link href={homeHref} className="flex items-center gap-2.5">
+          <div className="relative flex h-8 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white p-0.5 shadow-sm">
+            <Image
+              src="/images/logo.png"
+              alt="Gents Hood"
+              fill
+              className="object-contain p-0.5"
+            />
           </div>
-          <span className="text-[13px] font-semibold text-white">GENTS HOOD</span>
-        </div>
+          <span className="text-[13px] font-bold text-white">GENTS HOOD</span>
+        </Link>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:bg-white/[0.05] hover:text-white"

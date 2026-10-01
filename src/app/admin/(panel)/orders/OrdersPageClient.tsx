@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShoppingBag,
   Calendar,
@@ -13,19 +14,22 @@ import {
   Search,
   Plus,
   Loader2,
-  Eye,
   Edit2,
   Printer,
   ChevronDown,
-  MessageSquare,
-  ShieldCheck,
   Layers,
   AlertTriangle,
   X,
+  UserCheck,
+  Users,
+  UserPlus,
+  ShieldAlert,
 } from 'lucide-react';
 import { OrderFormModal } from './OrderFormModal';
 import { CourierModal } from './CourierModal';
 import { OrderDetailModal } from './OrderDetailModal';
+import { AppealFormModal, OrderAppealData } from './AppealFormModal';
+import { printOrders } from './InvoicePrint';
 
 interface OrderItem {
   id: string;
@@ -65,6 +69,15 @@ interface Order {
   isManualOrder: boolean;
   assignedToId?: string | null;
   assignedTo?: { id: string; name: string; displayColor: string } | null;
+  appealStatus?: string | null;
+  appeals?: Array<{
+    id: string;
+    reason: string;
+    note: string;
+    status: string;
+    staffName: string;
+    createdAt: string;
+  }>;
   items: OrderItem[];
   createdAt: string;
   updatedAt: string;
@@ -201,77 +214,170 @@ function isTodayOrder(dateStr: string) {
   );
 }
 
+export interface StaffMember {
+  id: string;
+  name: string;
+  displayColor: string;
+  isOnline?: boolean;
+}
+
 export default function OrdersPageClient({
   initialOrders,
   initialCounts,
   session,
-  staffList,
+  staffList: initialStaffList,
 }: {
   initialOrders: Order[];
   initialCounts: Counts;
   session: { id: string; name: string; role: string };
-  staffList: Array<{ id: string; name: string; displayColor: string }>;
+  staffList: StaffMember[];
 }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [counts, setCounts] = useState<Counts>(initialCounts);
+  const [staffList, setStaffList] = useState<StaffMember[]>(initialStaffList);
+  const onlineStaffList = useMemo(() => staffList.filter((s) => s.isOnline), [staffList]);
   const [activeTab, setActiveTab] = useState<Tab>('processing');
   const [search, setSearch] = useState('');
+  const [appealOrder, setAppealOrder] = useState<Order | null>(null);
+  const [appealSuccessMsg, setAppealSuccessMsg] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [courierOrderId, setCourierOrderId] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
-  const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
-  const [showFraudModal, setShowFraudModal] = useState(false);
+  const [openStatusMenu, setOpenStatusMenu] = useState<{
+    orderId: string;
+    currentStatus: string;
+    coords: { top: number; left: number };
+  } | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  // Assign dropdown
+  const [openAssignMenu, setOpenAssignMenu] = useState<{
+    orderId: string;
+    coords: { top: number; left: number };
+  } | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  // Staff filter
+  const [staffFilterId, setStaffFilterId] = useState<string | null>(null);
+  const [showStaffFilter, setShowStaffFilter] = useState(false);
+  const staffFilterRef = useRef<HTMLDivElement>(null);
+  // Bulk assign
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+  const bulkAssignRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isOwner = session.role === 'OWNER';
 
-  const fetchOrders = useCallback(async () => {
-    setIsRefreshing(true);
+  const fetchOrders = useCallback(async (searchQuery?: string) => {
     try {
-      const res = await fetch('/api/admin/orders?status=ALL', { cache: 'no-store' });
+      const q = typeof searchQuery === 'string' ? searchQuery : search;
+      const url = q.trim()
+        ? `/api/admin/orders?status=ALL&search=${encodeURIComponent(q.trim())}`
+        : `/api/admin/orders?status=ALL`;
+      const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setOrders(data.orders);
         setCounts(data.counts);
+        if (data.staffList) {
+          setStaffList(data.staffList);
+        }
       }
-    } finally {
-      setIsRefreshing(false);
+    } catch (e) {
+      console.error('Failed to fetch orders:', e);
     }
-  }, []);
+  }, [search]);
 
-  // Auto-refresh every 30 seconds
+  // Debounced search trigger across all store orders
   useEffect(() => {
-    const interval = setInterval(fetchOrders, 30000);
+    const timer = setTimeout(() => {
+      fetchOrders(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, fetchOrders]);
+
+  // Auto-refresh every 30 seconds (when not searching)
+  useEffect(() => {
+    if (search.trim()) return;
+    const interval = setInterval(() => fetchOrders(), 30000);
     return () => clearInterval(interval);
-  }, [fetchOrders]);
+  }, [fetchOrders, search]);
 
-  // Close dropdown on outside click
+  // Close status dropdown on scroll or window resize
   useEffect(() => {
-    const handleClickOutside = () => setOpenStatusMenuId(null);
-    window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
-  }, []);
+    if (!openStatusMenu) return;
+    const handleClose = () => setOpenStatusMenu(null);
+    window.addEventListener('scroll', handleClose, true);
+    window.addEventListener('resize', handleClose);
+    return () => {
+      window.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('resize', handleClose);
+    };
+  }, [openStatusMenu]);
+
+  // Close assign dropdown on scroll/resize
+  useEffect(() => {
+    if (!openAssignMenu) return;
+    const handleClose = () => setOpenAssignMenu(null);
+    window.addEventListener('scroll', handleClose, true);
+    window.addEventListener('resize', handleClose);
+    return () => {
+      window.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('resize', handleClose);
+    };
+  }, [openAssignMenu]);
+
+  // Close staff filter dropdown on outside click
+  useEffect(() => {
+    if (!showStaffFilter) return;
+    const handleClick = (e: MouseEvent) => {
+      if (staffFilterRef.current && !staffFilterRef.current.contains(e.target as Node)) {
+        setShowStaffFilter(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showStaffFilter]);
+
+  // Close bulk assign dropdown on outside click
+  useEffect(() => {
+    if (!showBulkAssign) return;
+    const handleClick = (e: MouseEvent) => {
+      if (bulkAssignRef.current && !bulkAssignRef.current.contains(e.target as Node)) {
+        setShowBulkAssign(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showBulkAssign]);
 
   const filteredOrders = useMemo(() => {
     let result = [...orders];
 
-    // Tab filter
-    if (activeTab === 'today') {
-      result = result.filter((o) => isTodayOrder(o.createdAt));
-    } else if (activeTab !== 'all') {
-      const tab = TABS.find((t) => t.id === activeTab);
-      if (tab?.statusFilter) {
-        result = result.filter((o) => o.status === tab.statusFilter);
+    if (!search.trim()) {
+      // Tab filter (only when not searching)
+      if (activeTab === 'today') {
+        result = result.filter((o) => isTodayOrder(o.createdAt));
+      } else if (activeTab !== 'all') {
+        const tab = TABS.find((t) => t.id === activeTab);
+        if (tab?.statusFilter) {
+          result = result.filter((o) => o.status === tab.statusFilter);
+        }
       }
-    }
 
-    // Search filter
-    if (search.trim()) {
+      // Staff filter
+      if (staffFilterId) {
+        result = result.filter((o) => o.assignedToId === staffFilterId);
+      }
+    } else {
+      // Cross-store search filter: check query against loaded search results
       const q = search.toLowerCase().trim();
       result = result.filter(
         (o) =>
@@ -284,7 +390,7 @@ export default function OrdersPageClient({
     }
 
     return result;
-  }, [orders, activeTab, search]);
+  }, [orders, activeTab, search, staffFilterId]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -311,7 +417,7 @@ export default function OrdersPageClient({
       body: JSON.stringify({ status: newStatus }),
     });
     if (res.ok) {
-      setOpenStatusMenuId(null);
+      setOpenStatusMenu(null);
       await fetchOrders();
     }
   };
@@ -354,16 +460,57 @@ export default function OrdersPageClient({
     return 0;
   };
 
-  const openWhatsApp = (phone: string, e?: React.MouseEvent) => {
+  const printInvoice = (order: Order, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const raw = phone.replace(/\D/g, '');
-    const clean = raw.startsWith('88') ? raw : `88${raw}`;
-    window.open(`https://wa.me/${clean}`, '_blank');
+    printOrders([order], session.name);
   };
 
-  const printInvoice = (orderId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    window.open(`/admin/orders/${orderId}`, '_blank');
+  const handleBulkPrint = () => {
+    const ordersToPrint = filteredOrders.filter(
+      (o) => selectedIds.size > 0 ? selectedIds.has(o.id) : true
+    );
+    if (ordersToPrint.length === 0) return;
+    printOrders(ordersToPrint, session.name);
+  };
+
+  const handleAssignOrder = async (orderId: string, staffId: string) => {
+    setAssigningId(staffId);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedToId: staffId }),
+      });
+      if (res.ok) {
+        setOpenAssignMenu(null);
+        await fetchOrders();
+      }
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  const activeStaffName = staffFilterId
+    ? staffList.find((s) => s.id === staffFilterId)?.name || 'Staff'
+    : null;
+
+  const handleBulkAssign = async (staffId: string) => {
+    if (selectedIds.size === 0) return;
+    setBulkAssigning(true);
+    try {
+      for (const id of Array.from(selectedIds)) {
+        await fetch(`/api/admin/orders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignedToId: staffId }),
+        });
+      }
+      setSelectedIds(new Set());
+      setShowBulkAssign(false);
+      await fetchOrders();
+    } finally {
+      setBulkAssigning(false);
+    }
   };
 
   return (
@@ -376,16 +523,6 @@ export default function OrdersPageClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Refresh */}
-          <button
-            onClick={fetchOrders}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#1a1a1e] px-2.5 py-2 text-xs font-medium text-zinc-300 transition-all hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
-            title="Refresh Orders"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-
           {/* Order Sync */}
           {isOwner && (
             <button
@@ -402,15 +539,6 @@ export default function OrdersPageClient({
             </button>
           )}
 
-          {/* Fraud Checker */}
-          <button
-            onClick={() => setShowFraudModal(true)}
-            className="flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500/20"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Fraud Checker</span>
-          </button>
-
           {/* Bulk Process */}
           <button
             onClick={() => setShowBulkModal(true)}
@@ -424,6 +552,27 @@ export default function OrdersPageClient({
               </span>
             )}
           </button>
+
+          {/* Bulk Print — only visible in shipped tab */}
+          {activeTab === 'shipped' && (
+            <button
+              onClick={handleBulkPrint}
+              className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all ${
+                selectedIds.size > 0
+                  ? 'border-purple-500/40 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25'
+                  : 'border-white/[0.08] bg-[#1a1a1e] text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+              }`}
+              title={selectedIds.size > 0 ? `Print ${selectedIds.size} selected invoices` : 'Print all shipped invoices'}
+            >
+              <Printer className="h-3.5 w-3.5" />
+              <span>Bulk Print</span>
+              {selectedIds.size > 0 && (
+                <span className="rounded-full bg-purple-500 px-1.5 font-mono text-[10px] font-bold text-white">
+                  {selectedIds.size}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Create Order Button */}
           <button
@@ -498,17 +647,200 @@ export default function OrdersPageClient({
         })}
       </div>
 
-      {/* Search Input Filter */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            placeholder="Search order ID, customer, phone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-3 text-xs text-white placeholder-zinc-500 outline-none transition-colors focus:border-zinc-500"
-          />
+      {/* Appeal Success Banner */}
+      {appealSuccessMsg && (
+        <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            <span>{appealSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setAppealSuccessMsg(null)}
+            className="text-emerald-400/70 hover:text-emerald-300"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Search + Staff Filter Row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative w-64 sm:w-80">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Search order ID, customer, phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-8 text-xs text-white placeholder-zinc-500 outline-none transition-colors focus:border-zinc-500"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {search.trim() && (
+            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-400">
+              Searching all store orders
+            </span>
+          )}
+
+          {/* Staff Filter Dropdown */}
+          {isOwner && staffList.length > 0 && (
+            <div className="relative" ref={staffFilterRef}>
+              <button
+                type="button"
+                onClick={() => setShowStaffFilter((p) => !p)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                  staffFilterId
+                    ? 'border-indigo-500/50 bg-indigo-500/15 text-indigo-300'
+                    : 'border-white/[0.08] bg-[#141416] text-zinc-300 hover:border-white/20 hover:text-white'
+                }`}
+                title="Filter by staff member"
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>{activeStaffName ? activeStaffName : 'Filter by Staff'}</span>
+                {staffFilterId ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setStaffFilterId(null); }}
+                    className="ml-0.5 rounded-sm text-indigo-300 hover:text-white"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : (
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showStaffFilter ? 'rotate-180' : ''}`} />
+                )}
+              </button>
+
+              {showStaffFilter && (
+                <div className="absolute left-0 top-full z-[200] mt-1.5 w-52 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl">
+                  <div className="border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                    Filter by Staff
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setStaffFilterId(null); setShowStaffFilter(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
+                      !staffFilterId ? 'font-bold text-white' : 'text-zinc-400'
+                    }`}
+                  >
+                    <ShoppingBag className="h-3.5 w-3.5 text-zinc-500" />
+                    All Staff
+                    {!staffFilterId && <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />}
+                  </button>
+                  {staffList.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { setStaffFilterId(s.id); setShowStaffFilter(false); }}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
+                        staffFilterId === s.id ? 'font-bold text-white' : 'text-zinc-400'
+                      }`}
+                    >
+                      <span
+                        className="h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shrink-0"
+                        style={{ backgroundColor: s.displayColor || '#6366f1' }}
+                      >
+                        {s.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="truncate">{s.name}</span>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 rounded-full ${s.isOnline ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                        <span className={`text-[9px] font-mono ${s.isOnline ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                          {s.isOnline ? 'Online' : 'Offline'}
+                        </span>
+                        {staffFilterId === s.id && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bulk Assign Button — only for pending & processing tabs */}
+          {isOwner && (activeTab === 'pending' || activeTab === 'processing') && (
+            <div className="relative" ref={bulkAssignRef}>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || onlineStaffList.length === 0}
+                onClick={() => setShowBulkAssign((p) => !p)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                  selectedIds.size > 0 && onlineStaffList.length > 0
+                    ? 'border-violet-500/50 bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'
+                    : 'cursor-not-allowed border-white/[0.06] bg-white/[0.02] text-zinc-600 opacity-50'
+                }`}
+                title={
+                  onlineStaffList.length === 0
+                    ? 'All staff are offline (Cannot assign orders)'
+                    : selectedIds.size === 0
+                    ? 'Select orders first to bulk assign'
+                    : 'Bulk assign selected orders to online staff'
+                }
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Bulk Assign</span>
+                {selectedIds.size > 0 && (
+                  <span className="rounded-full bg-violet-500 px-1.5 font-mono text-[10px] font-bold text-white">
+                    {selectedIds.size}
+                  </span>
+                )}
+                <ChevronDown className={`h-3 w-3 transition-transform ${showBulkAssign ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showBulkAssign && selectedIds.size > 0 && (
+                <div className="absolute left-0 top-full z-[200] mt-1.5 w-60 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl">
+                  <div className="border-b border-white/[0.06] px-3 py-2 flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                      Assign {selectedIds.size} order{selectedIds.size > 1 ? 's' : ''} to
+                    </p>
+                    <span className="text-[9px] font-bold text-emerald-400">Online only</span>
+                  </div>
+                  {onlineStaffList.length === 0 ? (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-[11px] font-medium text-amber-400">All staff are offline</p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500">Orders can only be assigned to online staff</p>
+                    </div>
+                  ) : (
+                    onlineStaffList.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={bulkAssigning}
+                        onClick={() => handleBulkAssign(s.id)}
+                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs text-zinc-300 transition-colors hover:bg-violet-500/10 hover:text-white disabled:opacity-60"
+                      >
+                        {bulkAssigning ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
+                        ) : (
+                          <span
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                            style={{ backgroundColor: s.displayColor || '#6366f1' }}
+                          >
+                            {s.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="truncate font-medium">{s.name}</span>
+                        <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Online
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {selectedIds.size > 0 && (
@@ -569,7 +901,8 @@ export default function OrdersPageClient({
               ) : (
                 filteredOrders.map((order) => {
                   const isSelected = selectedIds.has(order.id);
-                  const isStatusOpen = openStatusMenuId === order.id;
+                  const isStatusOpen = openStatusMenu?.orderId === order.id;
+                  const isLocked = order.status === 'RETURNED';
                   const statusConf = STATUS_CONFIG[order.status] || {
                     label: order.status,
                     bg: 'bg-zinc-800',
@@ -594,11 +927,64 @@ export default function OrdersPageClient({
                         />
                       </td>
 
-                      {/* ORDER ID */}
+                      {/* ORDER ID & STAFF MARKER */}
                       <td className="whitespace-nowrap px-4 py-3.5">
-                        <span className="rounded-md border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 font-mono text-xs font-semibold text-rose-300">
-                          {order.orderNo}
-                        </span>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setViewOrderId(order.id)}
+                              className="rounded-md border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/40 transition-colors"
+                              title="Click to view order details"
+                            >
+                              {order.orderNo}
+                            </button>
+
+                            {/* Appeal Badge */}
+                            {order.appealStatus === 'PENDING' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
+                                <ShieldAlert className="h-3 w-3" />
+                                Appeal Pending
+                              </span>
+                            )}
+                            {order.appealStatus === 'APPROVED' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Appealed
+                              </span>
+                            )}
+                            {order.appealStatus === 'REJECTED' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                                <XCircle className="h-3 w-3" />
+                                Declined
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Staff Assigned Marker */}
+                          <div className="flex items-center gap-1 text-[10px]">
+                            {order.assignedTo ? (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium border"
+                                style={{
+                                  backgroundColor: `${order.assignedTo.displayColor || '#6366f1'}15`,
+                                  borderColor: `${order.assignedTo.displayColor || '#6366f1'}40`,
+                                  color: order.assignedTo.displayColor || '#a5b4fc',
+                                }}
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{ backgroundColor: order.assignedTo.displayColor || '#6366f1' }}
+                                />
+                                👤 {order.assignedTo.name}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 font-medium text-zinc-500">
+                                Unassigned
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* CUSTOMER */}
@@ -650,100 +1036,147 @@ export default function OrdersPageClient({
 
                       {/* STATUS DROPDOWN PILL */}
                       <td className="whitespace-nowrap px-4 py-3.5">
-                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => setOpenStatusMenuId(isStatusOpen ? null : order.id)}
-                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all ${statusConf.bg} ${statusConf.text} ${statusConf.border}`}
-                          >
-                            <span>{statusConf.label}</span>
-                            <ChevronDown className="h-3 w-3" />
-                          </button>
+                        <div className="relative inline-block">
+                          {isLocked ? (
+                            /* RETURNED: non-clickable locked pill */
+                            <span
+                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold cursor-not-allowed opacity-70 ${statusConf.bg} ${statusConf.text} ${statusConf.border}`}
+                              title="Order is returned and cannot be changed"
+                            >
+                              <span>{statusConf.label}</span>
+                              <XCircle className="h-3 w-3" />
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (openStatusMenu?.orderId === order.id) {
+                                  setOpenStatusMenu(null);
+                                  return;
+                                }
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const menuHeight = 230;
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight;
 
-                          {/* Status Options Menu */}
-                          {isStatusOpen && (
-                            <div className="absolute left-0 top-full z-40 mt-1 w-32 rounded-lg border border-white/[0.1] bg-[#1a1a1d] py-1 shadow-2xl">
-                              {Object.entries(STATUS_CONFIG).map(([stKey, conf]) => (
-                                <button
-                                  key={stKey}
-                                  type="button"
-                                  onClick={() => handleStatusChange(order.id, stKey)}
-                                  className={`flex w-full items-center px-3 py-1.5 text-xs transition-colors hover:bg-white/[0.08] ${
-                                    order.status === stKey
-                                      ? 'font-bold text-white'
-                                      : 'text-zinc-400'
-                                  }`}
-                                >
-                                  <span className={conf.text}>{conf.label}</span>
-                                </button>
-                              ))}
-                            </div>
+                                setOpenStatusMenu({
+                                  orderId: order.id,
+                                  currentStatus: order.status,
+                                  coords: {
+                                    top: openUpwards
+                                      ? Math.max(10, rect.top - menuHeight - 4)
+                                      : rect.bottom + 4,
+                                    left: Math.max(10, Math.min(rect.left, window.innerWidth - 160)),
+                                  },
+                                });
+                              }}
+                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all hover:brightness-110 active:scale-95 ${statusConf.bg} ${statusConf.text} ${statusConf.border}`}
+                            >
+                              <span>{statusConf.label}</span>
+                              <ChevronDown
+                                className={`h-3 w-3 transition-transform duration-150 ${
+                                  isStatusOpen ? 'rotate-180' : ''
+                                }`}
+                              />
+                            </button>
                           )}
                         </div>
                       </td>
 
                       {/* ACTIONS ROW */}
                       <td className="whitespace-nowrap px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* View Order Detail */}
-                          <button
-                            type="button"
-                            onClick={() => setViewOrderId(order.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-zinc-400 hover:text-white"
-                            title="View Order Details"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
+                        {isLocked ? (
+                          /* RETURNED: all actions locked */
+                          <span className="inline-flex items-center gap-1.5 rounded-md border border-orange-500/20 bg-orange-500/5 px-2.5 py-1 text-[10px] font-semibold text-orange-400/70">
+                            <XCircle className="h-3 w-3" />
+                            Locked
+                          </span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Courier Entry Button — only for SHIPPED orders */}
+                            {order.status === 'SHIPPED' && (
+                              <button
+                                type="button"
+                                onClick={() => setCourierOrderId(order.id)}
+                                disabled={order.courierEntryDone}
+                                className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
+                                  order.courierEntryDone
+                                    ? 'cursor-not-allowed border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                    : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-purple-400 hover:text-purple-300'
+                                }`}
+                                title={
+                                  order.courierEntryDone
+                                    ? 'Courier already entered'
+                                    : 'Enter to Courier'
+                                }
+                              >
+                                <Truck className="h-3.5 w-3.5" />
+                              </button>
+                            )}
 
-                          {/* Courier Entry Button */}
-                          <button
-                            type="button"
-                            onClick={() => setCourierOrderId(order.id)}
-                            disabled={order.courierEntryDone}
-                            className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
-                              order.courierEntryDone
-                                ? 'cursor-not-allowed border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-purple-400 hover:text-purple-300'
-                            }`}
-                            title={
-                              order.courierEntryDone
-                                ? 'Courier already entered'
-                                : 'Enter to Courier'
-                            }
-                          >
-                            <Truck className="h-3.5 w-3.5" />
-                          </button>
+                            {/* Print Invoice */}
+                            <button
+                              type="button"
+                              onClick={(e) => printInvoice(order, e)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-zinc-400 hover:text-white"
+                              title="Print Invoice"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </button>
 
-                          {/* WhatsApp Chat Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => openWhatsApp(order.shippingPhone, e)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-400"
-                            title="Contact Customer on WhatsApp"
-                          >
-                            <MessageSquare className="h-3.5 w-3.5" />
-                          </button>
+                            {/* Assign to Staff — OWNER only, only for PENDING & PROCESSING */}
+                            {isOwner && (order.status === 'PENDING' || order.status === 'PROCESSING') && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (openAssignMenu?.orderId === order.id) {
+                                    setOpenAssignMenu(null);
+                                    return;
+                                  }
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const menuHeight = Math.max(1, onlineStaffList.length) * 40 + 50;
+                                  const spaceBelow = window.innerHeight - rect.bottom;
+                                  const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight;
+                                  setOpenAssignMenu({
+                                    orderId: order.id,
+                                    coords: {
+                                      top: openUpwards
+                                        ? Math.max(10, rect.top - menuHeight - 4)
+                                        : rect.bottom + 4,
+                                      left: Math.max(10, Math.min(rect.right - 192, window.innerWidth - 200)),
+                                    },
+                                  });
+                                }}
+                                className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
+                                  order.assignedToId
+                                    ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400 hover:border-indigo-400'
+                                    : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-indigo-400 hover:text-indigo-300'
+                                }`}
+                                title={order.assignedTo ? `Assigned to: ${order.assignedTo.name}` : 'Assign to staff'}
+                              >
+                                {order.assignedToId ? (
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                ) : (
+                                  <UserPlus className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            )}
 
-                          {/* Print Invoice */}
-                          <button
-                            type="button"
-                            onClick={(e) => printInvoice(order.id, e)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-zinc-400 hover:text-white"
-                            title="Print Invoice / Packing Slip"
-                          >
-                            <Printer className="h-3.5 w-3.5" />
-                          </button>
 
-                          {/* Edit Order */}
-                          <button
-                            type="button"
-                            onClick={() => setEditingOrder(order)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-zinc-400 hover:text-white"
-                            title="Edit Order"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+
+                            {/* Edit Order */}
+                            <button
+                              type="button"
+                              onClick={() => setEditingOrder(order)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 transition-colors hover:border-zinc-400 hover:text-white"
+                              title="Edit Order"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -801,74 +1234,123 @@ export default function OrdersPageClient({
         />
       )}
 
-      {/* Fraud Checker Modal */}
-      {showFraudModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Appeal Form Modal */}
+      {appealOrder && (
+        <AppealFormModal
+          order={appealOrder as unknown as OrderAppealData}
+          onClose={() => setAppealOrder(null)}
+          onSuccess={(msg) => {
+            setAppealOrder(null);
+            setAppealSuccessMsg(msg);
+            fetchOrders();
+            setTimeout(() => setAppealSuccessMsg(null), 6000);
+          }}
+        />
+      )}
+
+      {/* STATUS DROPDOWN FLOATING PORTAL */}
+      {mounted && openStatusMenu && typeof document !== 'undefined' && createPortal(
+        <>
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm"
-            onClick={() => setShowFraudModal(false)}
+            className="fixed inset-0 z-[9998] cursor-default bg-transparent"
+            onClick={() => setOpenStatusMenu(null)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#161619] p-6 text-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-sm font-bold text-white">Fraud Risk Checker</h3>
-              </div>
-              <button
-                onClick={() => setShowFraudModal(false)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
+          <div
+            className="fixed z-[9999] w-36 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
+            style={{
+              top: `${openStatusMenu.coords.top}px`,
+              left: `${openStatusMenu.coords.left}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Update Status
             </div>
-
-            <div className="mt-4 space-y-3">
-              <p className="text-xs text-zinc-400">
-                Automated risk scan based on customer phone history, repeat cancellations, and order
-                frequency:
-              </p>
-
-              {orders.filter((o) => o.status === 'CANCELLED' || o.status === 'RETURNED').length ===
-              0 ? (
-                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-center">
-                  <CheckCircle2 className="mx-auto mb-1 h-6 w-6 text-emerald-400" />
-                  <p className="text-xs font-semibold text-emerald-300">Clean Records</p>
-                  <p className="text-[11px] text-emerald-400/80">
-                    No high-risk numbers or return flags detected.
-                  </p>
-                </div>
-              ) : (
-                <div className="max-h-60 space-y-2 overflow-y-auto">
-                  {orders
-                    .filter((o) => o.status === 'CANCELLED' || o.status === 'RETURNED')
-                    .map((o) => (
-                      <div
-                        key={o.id}
-                        className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 text-xs"
-                      >
-                        <div>
-                          <p className="font-semibold text-white">{o.shippingName}</p>
-                          <p className="font-mono text-[11px] text-zinc-400">{o.shippingPhone}</p>
-                        </div>
-                        <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                          {o.status}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowFraudModal(false)}
-                className="rounded-lg bg-zinc-800 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-700"
-              >
-                Close
-              </button>
-            </div>
+            {Object.entries(STATUS_CONFIG).map(([stKey, conf]) => {
+              const isCurrent = openStatusMenu.currentStatus === stKey;
+              return (
+                <button
+                  key={stKey}
+                  type="button"
+                  onClick={() => handleStatusChange(openStatusMenu.orderId, stKey)}
+                  className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-white/[0.08] ${
+                    isCurrent ? 'bg-white/[0.06] font-bold text-white' : 'text-zinc-400'
+                  }`}
+                >
+                  <span className={conf.text}>{conf.label}</span>
+                  {isCurrent && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </>,
+        document.body
+      )}
+
+      {/* ASSIGN DROPDOWN FLOATING PORTAL */}
+      {mounted && openAssignMenu && typeof document !== 'undefined' && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[9998] cursor-default bg-transparent"
+            onClick={() => setOpenAssignMenu(null)}
+          />
+          <div
+            className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
+            style={{
+              top: `${openAssignMenu.coords.top}px`,
+              left: `${openAssignMenu.coords.left}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/[0.06] px-3 py-1.5 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                Assign Order To
+              </span>
+              <span className="text-[9px] font-bold text-emerald-400">Online only</span>
+            </div>
+            {onlineStaffList.length === 0 ? (
+              <div className="px-3 py-4 text-center">
+                <p className="text-[11px] font-medium text-amber-400">All staff are offline</p>
+                <p className="mt-0.5 text-[10px] text-zinc-500">Orders can only be assigned to online staff</p>
+              </div>
+            ) : (
+              onlineStaffList.map((staff) => {
+                const currentOrder = orders.find((o) => o.id === openAssignMenu.orderId);
+                const isAssigned = currentOrder?.assignedToId === staff.id;
+                const isLoading = assigningId === staff.id;
+                return (
+                  <button
+                    key={staff.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleAssignOrder(openAssignMenu.orderId, staff.id)}
+                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.08] disabled:opacity-60 ${
+                      isAssigned ? 'bg-indigo-500/10 font-bold text-white' : 'text-zinc-400'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+                    ) : (
+                      <span
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                        style={{ backgroundColor: staff.displayColor || '#6366f1' }}
+                      >
+                        {staff.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="truncate">{staff.name}</span>
+                    <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Online
+                    </span>
+                    {isAssigned && <UserCheck className="ml-1 h-3.5 w-3.5 shrink-0 text-indigo-400" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </>,
+        document.body
       )}
 
       {/* Bulk Process Modal */}

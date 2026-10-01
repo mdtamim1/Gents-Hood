@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
 
     const orders = await db.order.findMany({

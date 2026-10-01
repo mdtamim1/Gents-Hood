@@ -17,9 +17,10 @@ const createStaffSchema = z.object({
     .object({
       orders: z.boolean().default(true),
       products: z.boolean().default(false),
-      customers: z.boolean().default(false),
+      dashboard: z.boolean().default(false),
       settings: z.boolean().default(false),
       analytics: z.boolean().default(false),
+      customers: z.boolean().default(false),
     })
     .optional(),
 });

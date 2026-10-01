@@ -4,20 +4,28 @@ import React from 'react';
  * Clean & Standard Style Manifesto Marquee
  * Features clean, high-contrast, luxury editorial typography without excessive glow or visual clutter.
  */
-export function StyleManifestoMarquee() {
-  const lineOneItems = [
-    { primary: 'Signature Style', secondary: 'for Modern Men.' },
-    { primary: 'Signature Style', secondary: 'for Modern Men.' },
-    { primary: 'Signature Style', secondary: 'for Modern Men.' },
-    { primary: 'Signature Style', secondary: 'for Modern Men.' },
-  ];
+interface StyleManifestoMarqueeProps {
+  line1?: string | null;
+  line2?: string | null;
+}
 
-  const lineTwoItems = [
-    { primary: 'Everyday Style,', secondary: 'Made Exceptional.' },
-    { primary: 'Everyday Style,', secondary: 'Made Exceptional.' },
-    { primary: 'Everyday Style,', secondary: 'Made Exceptional.' },
-    { primary: 'Everyday Style,', secondary: 'Made Exceptional.' },
-  ];
+function parseManifestoLine(text: string | null | undefined, defaultPrimary: string, defaultSecondary: string) {
+  if (!text || !text.trim()) return { primary: defaultPrimary, secondary: defaultSecondary };
+  const words = text.trim().split(/\s+/);
+  if (words.length <= 1) return { primary: words[0], secondary: '' };
+  const splitIndex = Math.min(2, Math.max(1, Math.floor(words.length / 2)));
+  return {
+    primary: words.slice(0, splitIndex).join(' '),
+    secondary: words.slice(splitIndex).join(' '),
+  };
+}
+
+export function StyleManifestoMarquee({ line1, line2 }: StyleManifestoMarqueeProps) {
+  const itemOne = parseManifestoLine(line1, 'Signature Style', 'for Modern Men.');
+  const itemTwo = parseManifestoLine(line2, 'Everyday Style,', 'Made Exceptional.');
+
+  const lineOneItems = [itemOne, itemOne, itemOne, itemOne];
+  const lineTwoItems = [itemTwo, itemTwo, itemTwo, itemTwo];
 
   return (
     <section

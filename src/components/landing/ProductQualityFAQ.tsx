@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 
-interface FAQItem {
+export interface FAQItem {
   id: string;
   number: string;
   badge: string;
@@ -11,7 +11,7 @@ interface FAQItem {
   highlights: string[];
 }
 
-const FAQ_ITEMS: FAQItem[] = [
+export const FAQ_ITEMS: FAQItem[] = [
   {
     id: 'faq-1',
     number: '01',
@@ -53,8 +53,24 @@ const FAQ_ITEMS: FAQItem[] = [
   },
 ];
 
-export function ProductQualityFAQ() {
+interface ProductQualityFAQProps {
+  faqsJson?: string | null;
+}
+
+export function ProductQualityFAQ({ faqsJson }: ProductQualityFAQProps = {}) {
   const [openId, setOpenId] = useState<string | null>(null);
+
+  const faqs = React.useMemo<FAQItem[]>(() => {
+    if (faqsJson) {
+      try {
+        const parsed = JSON.parse(faqsJson);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // fallback
+      }
+    }
+    return FAQ_ITEMS;
+  }, [faqsJson]);
 
   const toggleFAQ = (id: string) => {
     setOpenId((prev) => (prev === id ? null : id));
@@ -88,9 +104,9 @@ export function ProductQualityFAQ() {
           </div>
         </div>
 
-        {/* 3 FAQ Accordion Cards */}
+        {/* FAQ Accordion Cards */}
         <div className="mx-auto max-w-3xl space-y-3.5 sm:space-y-4">
-          {FAQ_ITEMS.map((item) => {
+          {faqs.map((item) => {
             const isOpen = openId === item.id;
             return (
               <div

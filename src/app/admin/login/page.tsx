@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Mail, ArrowRight, Eye, EyeOff, Shield, AlertTriangle } from 'lucide-react';
 
 function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get('from') || '/admin/dashboard';
   const reason = searchParams.get('reason');
 
   const [email, setEmail] = useState('');
@@ -38,7 +38,13 @@ function AdminLoginForm() {
         throw new Error(data.error || 'Authentication failed');
       }
 
-      router.push(from);
+      const explicitFrom = searchParams.get('from');
+      const destination =
+        explicitFrom && explicitFrom !== '/admin/dashboard'
+          ? explicitFrom
+          : data.redirectUrl || explicitFrom || '/admin/dashboard';
+
+      router.push(destination);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');
@@ -76,11 +82,17 @@ function AdminLoginForm() {
       <div className="relative z-10 w-full max-w-sm px-6">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-2xl shadow-indigo-500/30">
-            <Shield className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 relative flex h-16 w-44 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white p-2.5 shadow-2xl shadow-black/50">
+            <Image
+              src="/images/logo.png"
+              alt="Gents Hood Logo"
+              fill
+              className="object-contain p-1"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Admin Console</h1>
-          <p className="mt-1 text-[13px] text-white/35">Gents Hood Operations Center</p>
+          <p className="mt-1 text-[13px] text-white/40">Gents Hood Operations Center</p>
         </div>
 
         {/* Reason warning */}

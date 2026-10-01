@@ -8,13 +8,20 @@ import { ToastProvider } from '@/components/ui/Toast';
 export default async function AdminPanelLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
   if (!session) {
-    redirect('/admin/login');
+    redirect('/admin/login?reason=invalid_session');
   }
 
   // Verify account is still active
   const user = await db.adminUser.findUnique({
     where: { id: session.id },
-    select: { isActive: true, name: true, role: true, displayColor: true, sessionToken: true },
+    select: {
+      isActive: true,
+      name: true,
+      role: true,
+      displayColor: true,
+      sessionToken: true,
+      permissions: true,
+    },
   });
 
   if (!user) {
@@ -30,6 +37,15 @@ export default async function AdminPanelLayout({ children }: { children: React.R
     redirect('/admin/login?reason=session_expired');
   }
 
+  let parsedPermissions: Record<string, boolean> = {};
+  if (user.permissions) {
+    try {
+      parsedPermissions = JSON.parse(user.permissions);
+    } catch {
+      parsedPermissions = {};
+    }
+  }
+
   return (
     <ToastProvider>
       <div className="flex h-screen overflow-hidden bg-[#0a0a0b]">
@@ -40,6 +56,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
             name: user.name,
             role: user.role as 'OWNER' | 'STAFF',
             displayColor: user.displayColor || '#6366f1',
+            permissions: parsedPermissions,
           }}
         />
         <main className="flex-1 overflow-y-auto">

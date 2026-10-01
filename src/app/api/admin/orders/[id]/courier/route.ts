@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +14,14 @@ const courierSchema = z.object({
 // POST: Enter courier for an order (disables the button after)
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     const order = await db.order.findUnique({ where: { id: params.id } });
     if (!order) {

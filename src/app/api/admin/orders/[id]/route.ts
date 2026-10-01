@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
+
+const orderItemSchema = z.object({
+  productId: z.string(),
+  variantId: z.string().optional().nullable(),
+  nameSnapshot: z.string(),
+  sizeSnapshot: z.string().optional().nullable(),
+  colorSnapshot: z.string().optional().nullable(),
+  priceSnapshot: z.number(),
+  qty: z.number(),
+  imageSnapshot: z.string().optional().nullable(),
+});
+
+type OrderItemInput = z.infer<typeof orderItemSchema>;
 
 const updateOrderSchema = z.object({
   status: z
@@ -20,21 +34,25 @@ const updateOrderSchema = z.object({
   shippingName: z.string().optional(),
   shippingPhone: z.string().optional(),
   shippingDistrict: z.string().optional(),
-  shippingThana: z.string().optional(),
-  shippingArea: z.string().optional(),
-  shippingAddress: z.string().optional(),
+  shippingThana: z.string().optional().nullable(),
+  shippingArea: z.string().optional().nullable(),
+  shippingAddress: z.string().optional().nullable(),
   manualDiscount: z.number().optional(),
   paidAmount: z.number().optional(),
   deliveryCharge: z.number().optional(),
   activityNote: z.string().optional(),
+  items: z.array(orderItemSchema).optional(),
 });
 
 // GET: Single order
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
 
     const order = await db.order.findUnique({
@@ -45,15 +63,12 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
         activityLogs: { orderBy: { createdAt: 'desc' } },
         assignedTo: { select: { id: true, name: true, email: true, displayColor: true } },
         customer: { select: { id: true, name: true, phone: true, email: true } },
+        appeals: { orderBy: { createdAt: 'desc' } },
       },
     });
 
     if (!order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
-    }
-
-    if (session.role !== 'OWNER' && order.assignedToId !== session.id) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json({ success: true, order });
@@ -66,10 +81,14 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 // PATCH: Update order
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     const body = await request.json();
     const result = updateOrderSchema.safeParse(body);
@@ -80,16 +99,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       );
     }
 
-    const order = await db.order.findUnique({ where: { id: params.id } });
+    const order = await db.order.findUnique({
+      where: { id: params.id },
+      include: { items: true },
+    });
     if (!order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    if (session.role !== 'OWNER' && order.assignedToId !== session.id) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { status, activityNote, assignedToId, ...restUpdate } = result.data;
+    const { status, activityNote, assignedToId, items, ...restUpdate } = result.data;
     const updateData: Record<string, unknown> = { ...restUpdate };
 
     if (restUpdate.manualDiscount !== undefined || restUpdate.deliveryCharge !== undefined) {
@@ -108,6 +126,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       note?: string;
     }> = [];
 
+    // 1. Status Change
     if (status && status !== order.status) {
       updateData.status = status;
       await db.orderStatusHistory.create({
@@ -127,11 +146,30 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         action: 'STATUS_CHANGED',
         oldValue: order.status,
         newValue: status,
-        note: activityNote,
+        note: activityNote || `Status updated from ${order.status} to ${status}`,
       });
     }
 
+    // 2. Staff Assignment
     if (assignedToId !== undefined && session.role === 'OWNER') {
+      if (assignedToId) {
+        // Enforce: Staff MUST be online to receive order assignment
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const activeSession = await db.staffSession.findFirst({
+          where: {
+            staffId: assignedToId,
+            isActive: true,
+            lastSeenAt: { gte: fiveMinAgo },
+          },
+        });
+        if (!activeSession) {
+          return NextResponse.json(
+            { success: false, error: 'Cannot assign to offline staff. The staff member must be online.' },
+            { status: 400 }
+          );
+        }
+      }
+
       updateData.assignedToId = assignedToId;
       if (assignedToId && assignedToId !== order.assignedToId) {
         const newAssignee = await db.adminUser.findUnique({
@@ -145,11 +183,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           action: 'ASSIGNED',
           oldValue: order.assignedToId || 'Unassigned',
           newValue: newAssignee?.name || assignedToId,
-          note: `Reassigned by ${session.name}`,
+          note: `Reassigned to ${newAssignee?.name || assignedToId} by ${session.name}`,
         });
       }
     }
 
+    // 3. Optional Activity Note
     if (activityNote && !status) {
       activityLogsData.push({
         orderId: params.id,
@@ -160,34 +199,142 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       });
     }
 
-    const editableFields = [
-      'shippingName',
-      'shippingPhone',
-      'shippingAddress',
-      'shippingDistrict',
-      'shippingThana',
-      'shippingArea',
+    // 4. Granular Field-Level Diffs for Edits
+    const fieldDefinitions: Array<{
+      key: string;
+      label: string;
+      format?: (val: unknown) => string;
+    }> = [
+      { key: 'shippingName', label: 'Customer Name' },
+      { key: 'shippingPhone', label: 'Phone Number' },
+      { key: 'shippingDistrict', label: 'District' },
+      { key: 'shippingThana', label: 'Thana' },
+      { key: 'shippingArea', label: 'Area' },
+      { key: 'shippingAddress', label: 'Address' },
+      { key: 'courierName', label: 'Courier' },
+      { key: 'courierTrackingNo', label: 'Tracking No' },
+      { key: 'paymentMethod', label: 'Payment Method' },
+      { key: 'paymentStatus', label: 'Payment Status' },
+      {
+        key: 'deliveryCharge',
+        label: 'Delivery Charge',
+        format: (v) => `৳${Number(v || 0).toLocaleString()}`,
+      },
+      {
+        key: 'manualDiscount',
+        label: 'Discount',
+        format: (v) => `৳${Number(v || 0).toLocaleString()}`,
+      },
+      {
+        key: 'paidAmount',
+        label: 'Paid Amount',
+        format: (v) => `৳${Number(v || 0).toLocaleString()}`,
+      },
+      { key: 'note', label: 'Customer Note' },
+      { key: 'shopNote', label: 'Shop Note' },
     ];
-    const hasEdits = editableFields.some(
-      (f) => (restUpdate as Record<string, unknown>)[f] !== undefined
-    );
-    if (hasEdits) {
-      activityLogsData.push({
-        orderId: params.id,
-        adminId: session.id,
-        adminName: session.name,
-        action: 'EDITED',
-        note: `Order details updated by ${session.name}`,
-      });
+
+    fieldDefinitions.forEach(({ key, label, format }) => {
+      const newVal = (restUpdate as Record<string, unknown>)[key];
+      if (newVal !== undefined) {
+        const oldRaw = (order as Record<string, unknown>)[key];
+        const oldStr = oldRaw !== undefined && oldRaw !== null ? String(oldRaw).trim() : '';
+        const newStr = newVal !== null ? String(newVal).trim() : '';
+
+        if (oldStr !== newStr) {
+          const formattedOld = format ? format(oldRaw) : oldStr || 'None';
+          const formattedNew = format ? format(newVal) : newStr || 'None';
+
+          activityLogsData.push({
+            orderId: params.id,
+            adminId: session.id,
+            adminName: session.name,
+            action: 'EDITED',
+            oldValue: `${label}: ${formattedOld}`,
+            newValue: `${label}: ${formattedNew}`,
+            note: `Updated ${label} from "${formattedOld}" to "${formattedNew}"`,
+          });
+        }
+      }
+    });
+
+    // 5. Product items changes
+    if (items && Array.isArray(items)) {
+      const newItems: OrderItemInput[] = items;
+      const newSubtotal = newItems.reduce(
+        (sum: number, item: OrderItemInput) =>
+          sum + (Number(item.priceSnapshot) || 0) * (Number(item.qty) || 1),
+        0
+      );
+      const delivery = restUpdate.deliveryCharge ?? order.deliveryCharge;
+      const discount = restUpdate.manualDiscount ?? order.manualDiscount;
+      updateData.subtotal = newSubtotal;
+      updateData.total = newSubtotal + delivery - discount - order.discount;
+
+      const oldSummary = `${order.items.length} ${order.items.length === 1 ? 'item' : 'items'} (৳${order.subtotal.toLocaleString()})`;
+      const newSummary = `${newItems.length} ${newItems.length === 1 ? 'item' : 'items'} (৳${newSubtotal.toLocaleString()})`;
+
+      const oldItemsStr = order.items
+        .map(
+          (i) =>
+            `${i.nameSnapshot} (${i.sizeSnapshot || 'Std'}/${i.colorSnapshot || 'Def'}) x${i.qty}`
+        )
+        .sort()
+        .join(', ');
+      const newItemsStr = newItems
+        .map(
+          (i: OrderItemInput) =>
+            `${i.nameSnapshot} (${i.sizeSnapshot || 'Std'}/${i.colorSnapshot || 'Def'}) x${i.qty}`
+        )
+        .sort()
+        .join(', ');
+
+      if (oldItemsStr !== newItemsStr) {
+        activityLogsData.push({
+          orderId: params.id,
+          adminId: session.id,
+          adminName: session.name,
+          action: 'EDITED',
+          oldValue: `Products: ${oldSummary}`,
+          newValue: `Products: ${newSummary}`,
+          note: `Updated items to: ${newItemsStr}`,
+        });
+      }
     }
 
-    await db.$transaction([
+    const txOps: Prisma.PrismaPromise<unknown>[] = [
       db.order.update({
         where: { id: params.id },
         data: updateData,
       }),
-      ...activityLogsData.map((log) => db.orderActivityLog.create({ data: log })),
-    ]);
+    ];
+
+    if (items && Array.isArray(items)) {
+      txOps.push(db.orderItem.deleteMany({ where: { orderId: params.id } }));
+      if (items.length > 0) {
+        txOps.push(
+          db.orderItem.createMany({
+            data: items.map((item: OrderItemInput) => ({
+              orderId: params.id,
+              productId: item.productId,
+              variantId: item.variantId || null,
+              nameSnapshot: item.nameSnapshot,
+              sizeSnapshot: item.sizeSnapshot || null,
+              colorSnapshot: item.colorSnapshot || null,
+              priceSnapshot: Number(item.priceSnapshot) || 0,
+              qty: Number(item.qty) || 1,
+              imageSnapshot: item.imageSnapshot || null,
+            })),
+          })
+        );
+      }
+    }
+
+    activityLogsData.forEach((log) => {
+      txOps.push(db.orderActivityLog.create({ data: log }));
+    });
+
+    await db.$transaction(txOps);
 
     const updatedOrder = await db.order.findUnique({
       where: { id: params.id },

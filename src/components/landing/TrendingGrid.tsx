@@ -8,6 +8,7 @@ import { ProductWithRelations } from '@/types';
 interface TrendingGridProps {
   products?: ProductWithRelations[];
   bannerSettings?: string | null;
+  marqueeText?: string | null;
 }
 
 export interface TrendingBannerConfig {
@@ -82,7 +83,7 @@ function ScanlineCanvas() {
   );
 }
 
-export function TrendingGrid({ bannerSettings }: TrendingGridProps) {
+export function TrendingGrid({ bannerSettings, marqueeText }: TrendingGridProps) {
   let bannerConfig = defaultTrendingBanner;
   if (bannerSettings) {
     try {
@@ -91,6 +92,22 @@ export function TrendingGrid({ bannerSettings }: TrendingGridProps) {
       bannerConfig = defaultTrendingBanner;
     }
   }
+
+  const marqueeItems = React.useMemo(() => {
+    if (marqueeText) {
+      const parts = marqueeText
+        .split(/[|•]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length > 0) return parts;
+    }
+    return [
+      'BEST OF GENTS HOOD',
+      'PREMIUM COLLECTIONS',
+      'BEST OF GENTS HOOD',
+      'PREMIUM COLLECTIONS',
+    ];
+  }, [marqueeText]);
 
   const isVideo = bannerConfig.mediaType === 'video' && Boolean(bannerConfig.videoUrl);
   const linkHref = bannerConfig.linkUrl || '/trending';
@@ -252,12 +269,7 @@ export function TrendingGrid({ bannerSettings }: TrendingGridProps) {
               style={{ animationDuration: '14s' }}
             >
               {/* Set 1 */}
-              {[
-                'BEST OF GENTS HOOD',
-                'PREMIUM COLLECTIONS',
-                'BEST OF GENTS HOOD',
-                'PREMIUM COLLECTIONS',
-              ].map((text, idx) => (
+              {marqueeItems.map((text, idx) => (
                 <div key={`hud-s1-${idx}`} className="flex items-center gap-2.5 px-5 sm:px-8">
                   <span
                     className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#e50914] shadow-[0_0_8px_rgba(229,9,20,0.9)]"
@@ -273,12 +285,7 @@ export function TrendingGrid({ bannerSettings }: TrendingGridProps) {
               ))}
 
               {/* Set 2 (Duplicated for 100% Seamless Infinite Loop) */}
-              {[
-                'BEST OF GENTS HOOD',
-                'PREMIUM COLLECTIONS',
-                'BEST OF GENTS HOOD',
-                'PREMIUM COLLECTIONS',
-              ].map((text, idx) => (
+              {marqueeItems.map((text, idx) => (
                 <div key={`hud-s2-${idx}`} className="flex items-center gap-2.5 px-5 sm:px-8">
                   <span
                     className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#e50914] shadow-[0_0_8px_rgba(229,9,20,0.9)]"

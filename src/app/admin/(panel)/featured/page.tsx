@@ -1,10 +1,20 @@
 import React from 'react';
+import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+import { verifyAdminAccess } from '@/lib/permissions';
 import { FeaturedSelectorClient } from './FeaturedSelectorClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminFeaturedPage() {
+  const auth = await verifyAdminAccess('products');
+  if (!auth.authorized) {
+    if (auth.reason === 'forbidden' && auth.fallbackUrl) {
+      redirect(auth.fallbackUrl);
+    }
+    redirect(`/admin/login?reason=${auth.reason}`);
+  }
+
   const [products, siteSetting] = await Promise.all([
     db.product.findMany({
       where: { status: 'ACTIVE' },

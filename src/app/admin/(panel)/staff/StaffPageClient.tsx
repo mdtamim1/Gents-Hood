@@ -204,6 +204,38 @@ export function StaffPageClient({
               </div>
             </div>
 
+            {/* Granted Permissions List */}
+            <div className="mt-3 border-t border-white/[0.04] pt-2.5">
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-white/40">
+                Granted Modules
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {member.role === 'OWNER' ? (
+                  <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                    👑 Full Store Access
+                  </span>
+                ) : (
+                  <>
+                    {Object.entries(member.permissions || {})
+                      .filter(([k, v]) => v && k !== 'customers')
+                      .map(([key]) => (
+                        <span
+                          key={key}
+                          className="rounded bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold capitalize text-indigo-300"
+                        >
+                          ✓ {key}
+                        </span>
+                      ))}
+                    {Object.entries(member.permissions || {}).filter(([k, v]) => v && k !== 'customers').length === 0 && (
+                      <span className="rounded bg-red-500/10 px-2 py-0.5 text-[10px] text-red-400">
+                        No permissions
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Actions */}
             {member.id !== currentUserId && (
               <div className="mt-4 flex items-center gap-2 border-t border-white/[0.06] pt-3">
@@ -290,9 +322,9 @@ function StaffFormModal({
     permissions: staff?.permissions || {
       orders: true,
       products: false,
-      customers: false,
-      settings: false,
+      dashboard: false,
       analytics: false,
+      settings: false,
     },
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -337,7 +369,13 @@ function StaffFormModal({
     }
   };
 
-  const PERMISSIONS = ['orders', 'products', 'customers', 'settings', 'analytics'];
+  const PERMISSION_OPTIONS = [
+    { key: 'orders', label: 'Orders', desc: 'Manage orders, change status, assign courier & print invoice' },
+    { key: 'products', label: 'Products', desc: 'Catalog, pricing, stock, variants & signature item' },
+    { key: 'dashboard', label: 'Dashboard', desc: 'Store overview, revenue metrics and high-level charts' },
+    { key: 'analytics', label: 'Analytics', desc: 'Sales breakdown, trending items & financial analytics' },
+    { key: 'settings', label: 'Settings', desc: 'Marquees, banners, FAQs & store configurations' },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -439,32 +477,38 @@ function StaffFormModal({
           {/* Permissions */}
           {form.role === 'STAFF' && (
             <div>
-              <label className="mb-2 block text-[11px] font-medium text-white/50">
-                Access Permissions
-              </label>
-              <div className="space-y-2 rounded-xl border border-white/[0.06] bg-[#0f0f11] p-3">
-                {PERMISSIONS.map((perm) => (
-                  <label key={perm} className="flex cursor-pointer items-center justify-between">
-                    <span className="text-[12px] capitalize text-white/70">{perm}</span>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-[11px] font-medium text-white/50">
+                  Access Permissions (Select what staff can manage)
+                </label>
+                <span className="text-[10px] text-indigo-400 font-medium">Strictly Enforced</span>
+              </div>
+              <div className="space-y-2 rounded-xl border border-white/[0.06] bg-[#0f0f11] p-3 max-h-56 overflow-y-auto">
+                {PERMISSION_OPTIONS.map((item) => (
+                  <div key={item.key} className="flex items-center justify-between gap-2 py-1 border-b border-white/[0.03] last:border-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-semibold text-white/90">{item.label}</p>
+                      <p className="text-[10px] text-white/40 truncate">{item.desc}</p>
+                    </div>
                     <button
                       type="button"
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
-                          permissions: { ...f.permissions, [perm]: !f.permissions[perm] },
+                          permissions: { ...f.permissions, [item.key]: !f.permissions[item.key] },
                         }))
                       }
-                      className={`relative h-5 w-9 rounded-full transition-colors ${
-                        form.permissions[perm] ? 'bg-indigo-500' : 'bg-white/[0.12]'
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                        form.permissions[item.key] ? 'bg-indigo-500' : 'bg-white/[0.12]'
                       }`}
                     >
                       <span
                         className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                          form.permissions[perm] ? 'translate-x-4' : 'translate-x-0'
+                          form.permissions[item.key] ? 'translate-x-4' : 'translate-x-0'
                         }`}
                       />
                     </button>
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>

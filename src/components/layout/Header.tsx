@@ -7,13 +7,30 @@ import { useCartStore } from '@/store/cart';
 import { MobileMenu } from './MobileMenu';
 import { AnnouncementBar } from './AnnouncementBar';
 
-export function Header() {
+interface HeaderProps {
+  announcementText?: string | null;
+  announcementsJson?: string | null;
+}
+
+export function Header({ announcementText, announcementsJson }: HeaderProps = {}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
   const cartTotalItems = useCartStore((state) => state.getTotalItems());
   const setIsCartOpen = useCartStore((state) => state.setIsOpen);
+
+  const parsedAnnouncementItems = React.useMemo(() => {
+    if (announcementsJson) {
+      try {
+        const parsed = JSON.parse(announcementsJson);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // fallback
+      }
+    }
+    return undefined;
+  }, [announcementsJson]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -136,7 +153,7 @@ export function Header() {
         </div>
 
         {/* Animated Auto-Sliding Announcement Bar */}
-        <AnnouncementBar />
+        <AnnouncementBar text={announcementText} items={parsedAnnouncementItems} />
       </header>
 
       {/* Mobile Drawer Navigation */}

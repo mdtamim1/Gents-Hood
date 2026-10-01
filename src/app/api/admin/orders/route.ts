@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search')?.trim() || '';
@@ -32,17 +36,21 @@ export async function GET(request: NextRequest) {
       whereClause.createdAt = { gte: startOfDay, lt: endOfDay };
     }
 
-    // Staff can only see their own assigned orders (unless OWNER)
-    if (session.role !== 'OWNER') {
+
+
+    // Scoping:
+    // If not OWNER and NOT searching: staff only sees their own assigned orders
+    // If searching (e.g. customer phone or order ID): staff can search across ALL orders in the store!
+    if (session.role !== 'OWNER' && !search) {
       whereClause.assignedToId = session.id;
     }
 
-    // Search
+    // Search across entire store for orders
     if (search) {
       whereClause.OR = [
         { orderNo: { contains: search } },
         { shippingPhone: { contains: search } },
-        { shippingName: { contains: search, mode: 'insensitive' } },
+        { shippingName: { contains: search } },
         { shippingDistrict: { contains: search } },
       ];
     }
@@ -61,6 +69,10 @@ export async function GET(request: NextRequest) {
         },
         customer: {
           select: { id: true, name: true, phone: true, email: true },
+        },
+        appeals: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -84,6 +96,33 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Fetch live staff online status if OWNER
+    let staffList: Array<{ id: string; name: string; displayColor: string; isOnline: boolean }> = [];
+    if (session.role === 'OWNER') {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const [allStaff, activeSessions] = await Promise.all([
+        db.adminUser.findMany({
+          where: { isActive: true, role: 'STAFF' },
+          select: { id: true, name: true, displayColor: true },
+          orderBy: { name: 'asc' },
+        }),
+        db.staffSession.findMany({
+          where: {
+            isActive: true,
+            lastSeenAt: { gte: fiveMinAgo },
+          },
+          select: { staffId: true },
+        }),
+      ]);
+      const onlineIds = new Set(activeSessions.map((s) => s.staffId));
+      staffList = allStaff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        displayColor: s.displayColor || '#6366f1',
+        isOnline: onlineIds.has(s.id),
+      }));
+    }
+
     return NextResponse.json({
       success: true,
       orders,
@@ -91,6 +130,7 @@ export async function GET(request: NextRequest) {
         today: todayCount,
         byStatus: Object.fromEntries(statusCounts.map((s) => [s.status, s._count.status])),
       },
+      staffList,
     });
   } catch (error: unknown) {
     console.error('Failed to list orders:', error);
@@ -104,10 +144,14 @@ export async function GET(request: NextRequest) {
 // POST: Create manual order
 export async function POST(request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await verifyAdminAccess('orders');
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
     }
+    const session = auth.session;
 
     const body = await request.json();
 
