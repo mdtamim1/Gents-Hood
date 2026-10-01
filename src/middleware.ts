@@ -11,8 +11,33 @@ const getJwtSecret = () => {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = (request.headers.get('host') || '').toLowerCase();
+  const isAdminSubdomain = host.startsWith('admin.');
 
-  // 1. Guard Admin API routes (except login)
+  // 1. Subdomain Routing:
+  if (isAdminSubdomain) {
+    // If accessing root of admin subdomain (e.g. admin.gentshood.com/): send to /admin
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+
+    // If accessing shortcuts like /login -> send to /admin/login
+    if (pathname === '/login') {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+  } else if (
+    // If request is on main store domain (e.g. www.gentshood.com or gentshood.com)
+    // and accessing admin panel pages -> redirect to admin subdomain in production
+    process.env.NODE_ENV === 'production' &&
+    (host === 'gentshood.com' || host === 'www.gentshood.com') &&
+    pathname.startsWith('/admin')
+  ) {
+    const adminUrl = new URL(pathname, 'https://admin.gentshood.com');
+    adminUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(adminUrl);
+  }
+
+  // 2. Guard Admin API routes (except login)
   if (
     pathname.startsWith('/api/admin') &&
     !pathname.startsWith('/api/admin/auth/login') &&
@@ -37,7 +62,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 2. Guard Admin UI pages
+  // 3. Guard Admin UI pages
   if (pathname.startsWith('/admin')) {
     const isLoginPage = pathname === '/admin/login';
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
@@ -88,5 +113,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*'],
+  matcher: ['/((?!_next/static|_next/image|images|favicon.ico|robots.txt|sitemap.xml).*)'],
 };
