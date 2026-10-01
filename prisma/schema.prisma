@@ -292,3 +292,22 @@ model OrderAppeal {
   @@index([status, createdAt])
 }
 
+model CustomerInquiry {
+  id         String    @id @default(cuid())
+  name       String
+  email      String
+  phone      String?
+  subject    String
+  message    String
+  status     String    @default("NEW") // NEW, REVIEWED, RESOLVED
+  ipAddress  String?
+  adminNotes String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  expiresAt  DateTime  // Automatically set to createdAt + 7 days
+
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+

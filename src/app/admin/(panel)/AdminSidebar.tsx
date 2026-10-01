@@ -19,6 +19,7 @@ import {
   Wifi,
   WifiOff,
   ShieldAlert,
+  MessageSquare,
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -39,13 +40,50 @@ const NAV_LINKS: Array<{
   permissionKey?: string;
   ownerOnly: boolean;
 }> = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissionKey: 'dashboard', ownerOnly: false },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingBag, permissionKey: 'orders', ownerOnly: false },
-  { href: '/admin/appeals', label: 'Appeals', icon: ShieldAlert, permissionKey: 'orders', ownerOnly: false },
-  { href: '/admin/products', label: 'Products', icon: Shirt, permissionKey: 'products', ownerOnly: false },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, permissionKey: 'analytics', ownerOnly: false },
+  {
+    href: '/admin/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    permissionKey: 'dashboard',
+    ownerOnly: false,
+  },
+  {
+    href: '/admin/orders',
+    label: 'Orders',
+    icon: ShoppingBag,
+    permissionKey: 'orders',
+    ownerOnly: false,
+  },
+  { href: '/admin/queries', label: 'Check Query', icon: MessageSquare, ownerOnly: false },
+  {
+    href: '/admin/appeals',
+    label: 'Appeals',
+    icon: ShieldAlert,
+    permissionKey: 'orders',
+    ownerOnly: false,
+  },
+  {
+    href: '/admin/products',
+    label: 'Products',
+    icon: Shirt,
+    permissionKey: 'products',
+    ownerOnly: false,
+  },
+  {
+    href: '/admin/analytics',
+    label: 'Analytics',
+    icon: BarChart3,
+    permissionKey: 'analytics',
+    ownerOnly: false,
+  },
   { href: '/admin/staff', label: 'Staff', icon: UserCheck, ownerOnly: true },
-  { href: '/admin/site-settings', label: 'Settings', icon: Settings, permissionKey: 'settings', ownerOnly: false },
+  {
+    href: '/admin/site-settings',
+    label: 'Settings',
+    icon: Settings,
+    permissionKey: 'settings',
+    ownerOnly: false,
+  },
 ];
 
 export function AdminSidebar({ session }: AdminSidebarProps) {
@@ -54,6 +92,22 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [newQueriesCount, setNewQueriesCount] = useState<number>(0);
+
+  // Poll new queries count for live badge
+  const fetchQueryStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/queries/stats');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && typeof json.data?.newCount === 'number') {
+          setNewQueriesCount(json.data.newCount);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Heartbeat to keep session alive & check for deactivation
   const heartbeat = useCallback(async () => {
@@ -76,10 +130,14 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
   useEffect(() => {
     // Initial check
     heartbeat();
+    fetchQueryStats();
     // Check every 30 seconds
-    const interval = setInterval(heartbeat, 30000);
+    const interval = setInterval(() => {
+      heartbeat();
+      fetchQueryStats();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [heartbeat]);
+  }, [heartbeat, fetchQueryStats]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -112,7 +170,7 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
   const homeHref =
     session.role === 'OWNER' || session.permissions?.dashboard
       ? '/admin/dashboard'
-      : (visibleLinks[0]?.href || '/admin/orders');
+      : visibleLinks[0]?.href || '/admin/orders';
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -161,6 +219,11 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
                   }`}
                 />
                 <span className="flex-1">{label}</span>
+                {label === 'Check Query' && newQueriesCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500/20 px-1.5 text-[10px] font-bold text-rose-300 ring-1 ring-rose-500/40">
+                    {newQueriesCount}
+                  </span>
+                )}
                 {isActive && <ChevronRight className="h-3.5 w-3.5 text-indigo-400/60" />}
               </Link>
             );
@@ -225,12 +288,7 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
       <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[#0a0a0b] px-4 lg:hidden">
         <Link href={homeHref} className="flex items-center gap-2.5">
           <div className="relative flex h-8 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white p-0.5 shadow-sm">
-            <Image
-              src="/images/logo.png"
-              alt="Gents Hood"
-              fill
-              className="object-contain p-0.5"
-            />
+            <Image src="/images/logo.png" alt="Gents Hood" fill className="object-contain p-0.5" />
           </div>
           <span className="text-[13px] font-bold text-white">GENTS HOOD</span>
         </Link>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { contactFormSchema } from '@/lib/validators';
 import { rateLimit } from '@/lib/rate-limit';
+import { createInquiry } from '@/lib/services/inquiry.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,14 +70,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // In production, send notification email via Resend or log to database / CRM
+    // 4. Save to Database with automatic 7-day TTL expiration
+    const inquiry = await createInquiry({
+      name,
+      email,
+      phone,
+      subject,
+      message,
+      ipAddress: ip,
+    });
+
     console.info(
-      `[CONTACT INQUIRY] From: ${name} <${email}> | Phone: ${phone || 'N/A'} | Subject: ${subject}`
+      `[CONTACT INQUIRY SAVED] ID: ${inquiry.id} | From: ${name} <${email}> | Subject: ${subject}`
     );
-    console.info(`[CONTACT MESSAGE] ${message.substring(0, 100)}...`);
 
     return NextResponse.json({
       success: true,
+      data: { id: inquiry.id },
       message:
         'Thank you for reaching out. The Gents Hood concierge team will respond within 24 hours.',
     });
