@@ -14,9 +14,17 @@ async function handleMidnightReset(request: NextRequest) {
   try {
     // Secret check to ensure only Vercel Cron or authorized admin can call
     const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET || 'gh-cron-secret-2024';
+    const cronSecret = process.env.CRON_SECRET;
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret && process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { success: false, error: 'CRON_SECRET is not configured' },
+        { status: 500 }
+      );
+    }
+
+    const expectedSecret = cronSecret || 'gh-cron-secret-dev-only';
+    if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -180,7 +180,7 @@ export function FeaturedProduct({ initialProduct }: FeaturedProductProps) {
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-14">
           {/* ── LEFT: Image Gallery ── */}
           <div className="flex flex-col-reverse gap-3 sm:flex-row lg:sticky lg:top-24 lg:col-span-6">
-            <div className="flex gap-2 overflow-x-auto sm:flex-col sm:overflow-visible">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden py-1 sm:flex-col sm:overflow-visible sm:py-0">
               {productImages.map((img, idx) => (
                 <button
                   key={img.id}
@@ -684,8 +684,16 @@ export function FeaturedProduct({ initialProduct }: FeaturedProductProps) {
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: 'Cut & Drape', value: initialProduct?.cutDrape || 'Relaxed Drop Shoulder', icon: '↗' },
-                      { label: 'Hardware', value: initialProduct?.hardware || 'Concealed Storm Placket', icon: '⚙' },
+                      {
+                        label: 'Cut & Drape',
+                        value: initialProduct?.cutDrape || 'Relaxed Drop Shoulder',
+                        icon: '↗',
+                      },
+                      {
+                        label: 'Hardware',
+                        value: initialProduct?.hardware || 'Concealed Storm Placket',
+                        icon: '⚙',
+                      },
                     ].map(({ label, value, icon }) => (
                       <div
                         key={label}

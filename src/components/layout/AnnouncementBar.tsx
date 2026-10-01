@@ -62,6 +62,16 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
     return ANNOUNCEMENT_ITEMS;
   }, [items, text]);
 
+  // Ensure each set has at least 12 items so that it fills any screen width without empty gaps
+  const seamlessItems = React.useMemo(() => {
+    if (!displayItems || displayItems.length === 0) return displayItems;
+    let list = displayItems;
+    while (list.length < 12) {
+      list = [...list, ...displayItems];
+    }
+    return list;
+  }, [displayItems]);
+
   return (
     <aside
       aria-label="Store Announcements"
@@ -74,11 +84,11 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
       {/* Seamless Infinite Auto-Sliding Marquee Track */}
       <div
         className="animate-marquee-ticker flex items-center whitespace-nowrap"
-        style={{ animationDuration: '60s' }}
+        style={{ animationDuration: '30s' }}
       >
         {/* Set 1 */}
-        {displayItems.map((item, idx) => (
-          <div key={`s1-${item.id || idx}`} className="flex items-center">
+        {seamlessItems.map((item, idx) => (
+          <div key={`s1-${idx}`} className="flex items-center">
             <Link
               href={item.link || '/trending'}
               className="inline-flex items-center gap-2 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-white/95 transition-opacity hover:opacity-75 sm:text-[11px]"
@@ -91,8 +101,8 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
         ))}
 
         {/* Set 2 (Duplicated for 100% Seamless Infinite Loop) */}
-        {displayItems.map((item, idx) => (
-          <div key={`s2-${item.id || idx}`} className="flex items-center">
+        {seamlessItems.map((item, idx) => (
+          <div key={`s2-${idx}`} className="flex items-center">
             <Link
               href={item.link || '/trending'}
               className="inline-flex items-center gap-2 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-white/95 transition-opacity hover:opacity-75 sm:text-[11px]"

@@ -4,6 +4,7 @@ import { getAdminSession } from '@/lib/auth';
 import { AdminSidebar } from './AdminSidebar';
 import { db } from '@/lib/db';
 import { ToastProvider } from '@/components/ui/Toast';
+import { AdminIdleTimeout } from '@/components/admin/AdminIdleTimeout';
 
 export default async function AdminPanelLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
@@ -48,6 +49,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
 
   return (
     <ToastProvider>
+      <AdminIdleTimeout />
       <div className="flex h-screen overflow-hidden bg-[#0a0a0b]">
         <AdminSidebar
           session={{

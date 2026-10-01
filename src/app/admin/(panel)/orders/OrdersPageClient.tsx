@@ -30,6 +30,7 @@ import { CourierModal } from './CourierModal';
 import { OrderDetailModal } from './OrderDetailModal';
 import { AppealFormModal, OrderAppealData } from './AppealFormModal';
 import { printOrders } from './InvoicePrint';
+import { useToast } from '@/components/ui/Toast';
 
 interface OrderItem {
   id: string;
@@ -245,7 +246,9 @@ export default function OrdersPageClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const { showToast } = useToast();
   const [courierOrderId, setCourierOrderId] = useState<string | null>(null);
+  const [sendingCourierId, setSendingCourierId] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [openStatusMenu, setOpenStatusMenu] = useState<{
     orderId: string;
@@ -269,31 +272,72 @@ export default function OrdersPageClient({
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const bulkAssignRef = useRef<HTMLDivElement>(null);
 
+  // 1-Click Steadfast Courier Entry
+  const handleOneClickSteadfast = async (order: Order) => {
+    if (order.courierEntryDone || sendingCourierId === order.id) return;
+    setSendingCourierId(order.id);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/courier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courierName: 'Steadfast', autoCreateSteadfast: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Steadfast এ এন্ট্রি সফল! ট্র্যাকিং: ${data.trackingNo || 'Done'}`, 'success');
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  courierEntryDone: true,
+                  courierName: 'Steadfast',
+                  courierTrackingNo: data.trackingNo || null,
+                  courierEntryAt: new Date().toISOString(),
+                }
+              : o
+          )
+        );
+      } else {
+        showToast(data.error || 'Steadfast এন্ট্রি ব্যর্থ হয়েছে', 'danger');
+        setCourierOrderId(order.id);
+      }
+    } catch {
+      showToast('Network error connecting to Steadfast', 'danger');
+      setCourierOrderId(order.id);
+    } finally {
+      setSendingCourierId(null);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const isOwner = session.role === 'OWNER';
 
-  const fetchOrders = useCallback(async (searchQuery?: string) => {
-    try {
-      const q = typeof searchQuery === 'string' ? searchQuery : search;
-      const url = q.trim()
-        ? `/api/admin/orders?status=ALL&search=${encodeURIComponent(q.trim())}`
-        : `/api/admin/orders?status=ALL`;
-      const res = await fetch(url, { cache: 'no-store' });
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.orders);
-        setCounts(data.counts);
-        if (data.staffList) {
-          setStaffList(data.staffList);
+  const fetchOrders = useCallback(
+    async (searchQuery?: string) => {
+      try {
+        const q = typeof searchQuery === 'string' ? searchQuery : search;
+        const url = q.trim()
+          ? `/api/admin/orders?status=ALL&search=${encodeURIComponent(q.trim())}`
+          : `/api/admin/orders?status=ALL`;
+        const res = await fetch(url, { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success) {
+          setOrders(data.orders);
+          setCounts(data.counts);
+          if (data.staffList) {
+            setStaffList(data.staffList);
+          }
         }
+      } catch (e) {
+        console.error('Failed to fetch orders:', e);
       }
-    } catch (e) {
-      console.error('Failed to fetch orders:', e);
-    }
-  }, [search]);
+    },
+    [search]
+  );
 
   // Debounced search trigger across all store orders
   useEffect(() => {
@@ -303,11 +347,31 @@ export default function OrdersPageClient({
     return () => clearTimeout(timer);
   }, [search, fetchOrders]);
 
-  // Auto-refresh every 30 seconds (when not searching)
+  // Live auto-refresh: Fast 4-second background poll + Instant refresh on window focus/tab switch
   useEffect(() => {
     if (search.trim()) return;
-    const interval = setInterval(() => fetchOrders(), 30000);
-    return () => clearInterval(interval);
+
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchOrders();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // Fast 4s pulse when tab is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchOrders();
+      }
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+    };
   }, [fetchOrders, search]);
 
   // Close status dropdown on scroll or window resize
@@ -466,8 +530,8 @@ export default function OrdersPageClient({
   };
 
   const handleBulkPrint = () => {
-    const ordersToPrint = filteredOrders.filter(
-      (o) => selectedIds.size > 0 ? selectedIds.has(o.id) : true
+    const ordersToPrint = filteredOrders.filter((o) =>
+      selectedIds.size > 0 ? selectedIds.has(o.id) : true
     );
     if (ordersToPrint.length === 0) return;
     printOrders(ordersToPrint, session.name);
@@ -562,7 +626,11 @@ export default function OrdersPageClient({
                   ? 'border-purple-500/40 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25'
                   : 'border-white/[0.08] bg-[#1a1a1e] text-zinc-300 hover:bg-white/[0.06] hover:text-white'
               }`}
-              title={selectedIds.size > 0 ? `Print ${selectedIds.size} selected invoices` : 'Print all shipped invoices'}
+              title={
+                selectedIds.size > 0
+                  ? `Print ${selectedIds.size} selected invoices`
+                  : 'Print all shipped invoices'
+              }
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Bulk Print</span>
@@ -711,13 +779,18 @@ export default function OrdersPageClient({
                 {staffFilterId ? (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setStaffFilterId(null); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStaffFilterId(null);
+                    }}
                     className="ml-0.5 rounded-sm text-indigo-300 hover:text-white"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 ) : (
-                  <ChevronDown className={`h-3 w-3 transition-transform ${showStaffFilter ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${showStaffFilter ? 'rotate-180' : ''}`}
+                  />
                 )}
               </button>
 
@@ -728,37 +801,51 @@ export default function OrdersPageClient({
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setStaffFilterId(null); setShowStaffFilter(false); }}
+                    onClick={() => {
+                      setStaffFilterId(null);
+                      setShowStaffFilter(false);
+                    }}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
                       !staffFilterId ? 'font-bold text-white' : 'text-zinc-400'
                     }`}
                   >
                     <ShoppingBag className="h-3.5 w-3.5 text-zinc-500" />
                     All Staff
-                    {!staffFilterId && <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />}
+                    {!staffFilterId && (
+                      <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />
+                    )}
                   </button>
                   {staffList.map((s) => (
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => { setStaffFilterId(s.id); setShowStaffFilter(false); }}
+                      onClick={() => {
+                        setStaffFilterId(s.id);
+                        setShowStaffFilter(false);
+                      }}
                       className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
                         staffFilterId === s.id ? 'font-bold text-white' : 'text-zinc-400'
                       }`}
                     >
                       <span
-                        className="h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold text-white shrink-0"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                         style={{ backgroundColor: s.displayColor || '#6366f1' }}
                       >
                         {s.name.charAt(0).toUpperCase()}
                       </span>
                       <span className="truncate">{s.name}</span>
                       <div className="ml-auto flex items-center gap-1.5">
-                        <span className={`h-1.5 w-1.5 rounded-full ${s.isOnline ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-                        <span className={`text-[9px] font-mono ${s.isOnline ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${s.isOnline ? 'bg-emerald-400' : 'bg-zinc-600'}`}
+                        />
+                        <span
+                          className={`font-mono text-[9px] ${s.isOnline ? 'text-emerald-400' : 'text-zinc-500'}`}
+                        >
                           {s.isOnline ? 'Online' : 'Offline'}
                         </span>
-                        {staffFilterId === s.id && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                        {staffFilterId === s.id && (
+                          <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                        )}
                       </div>
                     </button>
                   ))}
@@ -783,8 +870,8 @@ export default function OrdersPageClient({
                   onlineStaffList.length === 0
                     ? 'All staff are offline (Cannot assign orders)'
                     : selectedIds.size === 0
-                    ? 'Select orders first to bulk assign'
-                    : 'Bulk assign selected orders to online staff'
+                      ? 'Select orders first to bulk assign'
+                      : 'Bulk assign selected orders to online staff'
                 }
               >
                 <UserPlus className="h-3.5 w-3.5" />
@@ -794,12 +881,14 @@ export default function OrdersPageClient({
                     {selectedIds.size}
                   </span>
                 )}
-                <ChevronDown className={`h-3 w-3 transition-transform ${showBulkAssign ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${showBulkAssign ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {showBulkAssign && selectedIds.size > 0 && (
                 <div className="absolute left-0 top-full z-[200] mt-1.5 w-60 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl">
-                  <div className="border-b border-white/[0.06] px-3 py-2 flex items-center justify-between">
+                  <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                       Assign {selectedIds.size} order{selectedIds.size > 1 ? 's' : ''} to
                     </p>
@@ -807,8 +896,12 @@ export default function OrdersPageClient({
                   </div>
                   {onlineStaffList.length === 0 ? (
                     <div className="px-3 py-4 text-center">
-                      <p className="text-[11px] font-medium text-amber-400">All staff are offline</p>
-                      <p className="mt-0.5 text-[10px] text-zinc-500">Orders can only be assigned to online staff</p>
+                      <p className="text-[11px] font-medium text-amber-400">
+                        All staff are offline
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500">
+                        Orders can only be assigned to online staff
+                      </p>
                     </div>
                   ) : (
                     onlineStaffList.map((s) => (
@@ -830,8 +923,8 @@ export default function OrdersPageClient({
                           </span>
                         )}
                         <span className="truncate font-medium">{s.name}</span>
-                        <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="ml-auto flex items-center gap-1 text-[10px] font-medium text-emerald-400">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                           Online
                         </span>
                       </button>
@@ -930,11 +1023,11 @@ export default function OrdersPageClient({
                       {/* ORDER ID & STAFF MARKER */}
                       <td className="whitespace-nowrap px-4 py-3.5">
                         <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setViewOrderId(order.id)}
-                              className="rounded-md border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/40 transition-colors"
+                              className="rounded-md border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 font-mono text-xs font-semibold text-rose-300 transition-colors hover:border-rose-500/40 hover:bg-rose-500/20"
                               title="Click to view order details"
                             >
                               {order.orderNo}
@@ -942,7 +1035,7 @@ export default function OrdersPageClient({
 
                             {/* Appeal Badge */}
                             {order.appealStatus === 'PENDING' && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
+                              <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                                 <ShieldAlert className="h-3 w-3" />
                                 Appeal Pending
                               </span>
@@ -965,7 +1058,7 @@ export default function OrdersPageClient({
                           <div className="flex items-center gap-1 text-[10px]">
                             {order.assignedTo ? (
                               <span
-                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium border"
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-medium"
                                 style={{
                                   backgroundColor: `${order.assignedTo.displayColor || '#6366f1'}15`,
                                   borderColor: `${order.assignedTo.displayColor || '#6366f1'}40`,
@@ -974,7 +1067,9 @@ export default function OrdersPageClient({
                               >
                                 <span
                                   className="h-1.5 w-1.5 rounded-full"
-                                  style={{ backgroundColor: order.assignedTo.displayColor || '#6366f1' }}
+                                  style={{
+                                    backgroundColor: order.assignedTo.displayColor || '#6366f1',
+                                  }}
                                 />
                                 👤 {order.assignedTo.name}
                               </span>
@@ -1040,7 +1135,7 @@ export default function OrdersPageClient({
                           {isLocked ? (
                             /* RETURNED: non-clickable locked pill */
                             <span
-                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold cursor-not-allowed opacity-70 ${statusConf.bg} ${statusConf.text} ${statusConf.border}`}
+                              className={`flex cursor-not-allowed items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold opacity-70 ${statusConf.bg} ${statusConf.text} ${statusConf.border}`}
                               title="Order is returned and cannot be changed"
                             >
                               <span>{statusConf.label}</span>
@@ -1058,7 +1153,8 @@ export default function OrdersPageClient({
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const menuHeight = 230;
                                 const spaceBelow = window.innerHeight - rect.bottom;
-                                const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight;
+                                const openUpwards =
+                                  spaceBelow < menuHeight && rect.top > menuHeight;
 
                                 setOpenStatusMenu({
                                   orderId: order.id,
@@ -1067,7 +1163,10 @@ export default function OrdersPageClient({
                                     top: openUpwards
                                       ? Math.max(10, rect.top - menuHeight - 4)
                                       : rect.bottom + 4,
-                                    left: Math.max(10, Math.min(rect.left, window.innerWidth - 160)),
+                                    left: Math.max(
+                                      10,
+                                      Math.min(rect.left, window.innerWidth - 160)
+                                    ),
                                   },
                                 });
                               }}
@@ -1098,20 +1197,27 @@ export default function OrdersPageClient({
                             {order.status === 'SHIPPED' && (
                               <button
                                 type="button"
-                                onClick={() => setCourierOrderId(order.id)}
-                                disabled={order.courierEntryDone}
-                                className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
+                                onClick={() => handleOneClickSteadfast(order)}
+                                disabled={order.courierEntryDone || sendingCourierId === order.id}
+                                className={`flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition-all ${
                                   order.courierEntryDone
                                     ? 'cursor-not-allowed border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                    : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-purple-400 hover:text-purple-300'
+                                    : 'border-purple-500/40 bg-purple-500/15 text-purple-300 hover:border-purple-400 hover:bg-purple-500/25 active:scale-95'
                                 }`}
                                 title={
                                   order.courierEntryDone
-                                    ? 'Courier already entered'
-                                    : 'Enter to Courier'
+                                    ? `Steadfast Entered (Tracking: ${order.courierTrackingNo || 'Done'})`
+                                    : '1-Click Steadfast Entry'
                                 }
                               >
-                                <Truck className="h-3.5 w-3.5" />
+                                {sendingCourierId === order.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
+                                ) : (
+                                  <Truck className="h-3.5 w-3.5" />
+                                )}
+                                <span className="hidden sm:inline">
+                                  {order.courierEntryDone ? 'Entered' : 'Steadfast Entry'}
+                                </span>
                               </button>
                             )}
 
@@ -1126,45 +1232,53 @@ export default function OrdersPageClient({
                             </button>
 
                             {/* Assign to Staff — OWNER only, only for PENDING & PROCESSING */}
-                            {isOwner && (order.status === 'PENDING' || order.status === 'PROCESSING') && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (openAssignMenu?.orderId === order.id) {
-                                    setOpenAssignMenu(null);
-                                    return;
+                            {isOwner &&
+                              (order.status === 'PENDING' || order.status === 'PROCESSING') && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (openAssignMenu?.orderId === order.id) {
+                                      setOpenAssignMenu(null);
+                                      return;
+                                    }
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const menuHeight =
+                                      Math.max(1, onlineStaffList.length) * 40 + 50;
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    const openUpwards =
+                                      spaceBelow < menuHeight && rect.top > menuHeight;
+                                    setOpenAssignMenu({
+                                      orderId: order.id,
+                                      coords: {
+                                        top: openUpwards
+                                          ? Math.max(10, rect.top - menuHeight - 4)
+                                          : rect.bottom + 4,
+                                        left: Math.max(
+                                          10,
+                                          Math.min(rect.right - 192, window.innerWidth - 200)
+                                        ),
+                                      },
+                                    });
+                                  }}
+                                  className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
+                                    order.assignedToId
+                                      ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400 hover:border-indigo-400'
+                                      : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-indigo-400 hover:text-indigo-300'
+                                  }`}
+                                  title={
+                                    order.assignedTo
+                                      ? `Assigned to: ${order.assignedTo.name}`
+                                      : 'Assign to staff'
                                   }
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const menuHeight = Math.max(1, onlineStaffList.length) * 40 + 50;
-                                  const spaceBelow = window.innerHeight - rect.bottom;
-                                  const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight;
-                                  setOpenAssignMenu({
-                                    orderId: order.id,
-                                    coords: {
-                                      top: openUpwards
-                                        ? Math.max(10, rect.top - menuHeight - 4)
-                                        : rect.bottom + 4,
-                                      left: Math.max(10, Math.min(rect.right - 192, window.innerWidth - 200)),
-                                    },
-                                  });
-                                }}
-                                className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
-                                  order.assignedToId
-                                    ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400 hover:border-indigo-400'
-                                    : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-indigo-400 hover:text-indigo-300'
-                                }`}
-                                title={order.assignedTo ? `Assigned to: ${order.assignedTo.name}` : 'Assign to staff'}
-                              >
-                                {order.assignedToId ? (
-                                  <UserCheck className="h-3.5 w-3.5" />
-                                ) : (
-                                  <UserPlus className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                            )}
-
-
+                                >
+                                  {order.assignedToId ? (
+                                    <UserCheck className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              )}
 
                             {/* Edit Order */}
                             <button
@@ -1249,109 +1363,119 @@ export default function OrdersPageClient({
       )}
 
       {/* STATUS DROPDOWN FLOATING PORTAL */}
-      {mounted && openStatusMenu && typeof document !== 'undefined' && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-[9998] cursor-default bg-transparent"
-            onClick={() => setOpenStatusMenu(null)}
-          />
-          <div
-            className="fixed z-[9999] w-36 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
-            style={{
-              top: `${openStatusMenu.coords.top}px`,
-              left: `${openStatusMenu.coords.left}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-              Update Status
-            </div>
-            {Object.entries(STATUS_CONFIG).map(([stKey, conf]) => {
-              const isCurrent = openStatusMenu.currentStatus === stKey;
-              return (
-                <button
-                  key={stKey}
-                  type="button"
-                  onClick={() => handleStatusChange(openStatusMenu.orderId, stKey)}
-                  className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-white/[0.08] ${
-                    isCurrent ? 'bg-white/[0.06] font-bold text-white' : 'text-zinc-400'
-                  }`}
-                >
-                  <span className={conf.text}>{conf.label}</span>
-                  {isCurrent && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
-                </button>
-              );
-            })}
-          </div>
-        </>,
-        document.body
-      )}
-
-      {/* ASSIGN DROPDOWN FLOATING PORTAL */}
-      {mounted && openAssignMenu && typeof document !== 'undefined' && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-[9998] cursor-default bg-transparent"
-            onClick={() => setOpenAssignMenu(null)}
-          />
-          <div
-            className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
-            style={{
-              top: `${openAssignMenu.coords.top}px`,
-              left: `${openAssignMenu.coords.left}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-white/[0.06] px-3 py-1.5 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                Assign Order To
-              </span>
-              <span className="text-[9px] font-bold text-emerald-400">Online only</span>
-            </div>
-            {onlineStaffList.length === 0 ? (
-              <div className="px-3 py-4 text-center">
-                <p className="text-[11px] font-medium text-amber-400">All staff are offline</p>
-                <p className="mt-0.5 text-[10px] text-zinc-500">Orders can only be assigned to online staff</p>
+      {mounted &&
+        openStatusMenu &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998] cursor-default bg-transparent"
+              onClick={() => setOpenStatusMenu(null)}
+            />
+            <div
+              className="animate-in fade-in zoom-in-95 fixed z-[9999] w-36 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl duration-100"
+              style={{
+                top: `${openStatusMenu.coords.top}px`,
+                left: `${openStatusMenu.coords.left}px`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                Update Status
               </div>
-            ) : (
-              onlineStaffList.map((staff) => {
-                const currentOrder = orders.find((o) => o.id === openAssignMenu.orderId);
-                const isAssigned = currentOrder?.assignedToId === staff.id;
-                const isLoading = assigningId === staff.id;
+              {Object.entries(STATUS_CONFIG).map(([stKey, conf]) => {
+                const isCurrent = openStatusMenu.currentStatus === stKey;
                 return (
                   <button
-                    key={staff.id}
+                    key={stKey}
                     type="button"
-                    disabled={isLoading}
-                    onClick={() => handleAssignOrder(openAssignMenu.orderId, staff.id)}
-                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.08] disabled:opacity-60 ${
-                      isAssigned ? 'bg-indigo-500/10 font-bold text-white' : 'text-zinc-400'
+                    onClick={() => handleStatusChange(openStatusMenu.orderId, stKey)}
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-white/[0.08] ${
+                      isCurrent ? 'bg-white/[0.06] font-bold text-white' : 'text-zinc-400'
                     }`}
                   >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-                    ) : (
-                      <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-                        style={{ backgroundColor: staff.displayColor || '#6366f1' }}
-                      >
-                        {staff.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="truncate">{staff.name}</span>
-                    <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Online
-                    </span>
-                    {isAssigned && <UserCheck className="ml-1 h-3.5 w-3.5 shrink-0 text-indigo-400" />}
+                    <span className={conf.text}>{conf.label}</span>
+                    {isCurrent && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
                   </button>
                 );
-              })
-            )}
-          </div>
-        </>,
-        document.body
-      )}
+              })}
+            </div>
+          </>,
+          document.body
+        )}
+
+      {/* ASSIGN DROPDOWN FLOATING PORTAL */}
+      {mounted &&
+        openAssignMenu &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998] cursor-default bg-transparent"
+              onClick={() => setOpenAssignMenu(null)}
+            />
+            <div
+              className="animate-in fade-in zoom-in-95 fixed z-[9999] w-48 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl backdrop-blur-xl duration-100"
+              style={{
+                top: `${openAssignMenu.coords.top}px`,
+                left: `${openAssignMenu.coords.left}px`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  Assign Order To
+                </span>
+                <span className="text-[9px] font-bold text-emerald-400">Online only</span>
+              </div>
+              {onlineStaffList.length === 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-[11px] font-medium text-amber-400">All staff are offline</p>
+                  <p className="mt-0.5 text-[10px] text-zinc-500">
+                    Orders can only be assigned to online staff
+                  </p>
+                </div>
+              ) : (
+                onlineStaffList.map((staff) => {
+                  const currentOrder = orders.find((o) => o.id === openAssignMenu.orderId);
+                  const isAssigned = currentOrder?.assignedToId === staff.id;
+                  const isLoading = assigningId === staff.id;
+                  return (
+                    <button
+                      key={staff.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => handleAssignOrder(openAssignMenu.orderId, staff.id)}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.08] disabled:opacity-60 ${
+                        isAssigned ? 'bg-indigo-500/10 font-bold text-white' : 'text-zinc-400'
+                      }`}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+                      ) : (
+                        <span
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                          style={{ backgroundColor: staff.displayColor || '#6366f1' }}
+                        >
+                          {staff.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="truncate">{staff.name}</span>
+                      <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                        Online
+                      </span>
+                      {isAssigned && (
+                        <UserCheck className="ml-1 h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </>,
+          document.body
+        )}
 
       {/* Bulk Process Modal */}
       {showBulkModal && (

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyAdminAccess } from '@/lib/permissions';
+import { rateLimit } from '@/lib/rate-limit';
+import { createAuditLog } from '@/lib/services/audit.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,14 +11,36 @@ export async function GET() {
     const auth = await verifyAdminAccess('orders');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
+      );
+    }
+
+    // Rate limit export requests (max 5 exports per 10 minutes)
+    const exportRate = await rateLimit(`admin_export_${auth.session.id}`, 5, 10 * 60 * 1000);
+    if (!exportRate.success) {
+      return NextResponse.json(
+        { success: false, error: 'Too many export requests. Please wait a few minutes.' },
+        { status: 429 }
       );
     }
 
     const orders = await db.order.findMany({
       orderBy: { createdAt: 'desc' },
       take: 500,
+    });
+
+    // Record audit trail for sensitive customer data export
+    await createAuditLog({
+      adminId: auth.session.id,
+      action: 'EXPORT',
+      entity: 'Order',
+      entityId: 'bulk-csv',
+      meta: { count: orders.length },
     });
 
     const csvHeaders = [

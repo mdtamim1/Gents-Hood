@@ -45,16 +45,21 @@ function ScanlineCanvas() {
 
     let frame = 0;
     let raf: number;
+    let frameCount = 0;
 
     const draw = () => {
-      const { width, height } = canvas;
-      ctx.clearRect(0, 0, width, height);
-      // Horizontal scanlines
-      for (let y = 0; y < height; y += 4) {
-        ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.03 * Math.sin((y + frame) * 0.05)})`;
-        ctx.fillRect(0, y, width, 1);
+      // Throttle: only draw every 3rd frame (~20fps) — scanlines are subtle, 60fps is wasteful
+      frameCount++;
+      if (frameCount % 3 === 0) {
+        const { width, height } = canvas;
+        ctx.clearRect(0, 0, width, height);
+        // Horizontal scanlines
+        for (let y = 0; y < height; y += 4) {
+          ctx.fillStyle = `rgba(0,0,0,${0.06 + 0.03 * Math.sin((y + frame) * 0.05)})`;
+          ctx.fillRect(0, y, width, 1);
+        }
+        frame++;
       }
-      frame++;
       raf = requestAnimationFrame(draw);
     };
 
@@ -62,13 +67,25 @@ function ScanlineCanvas() {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
     };
+
+    // Pause animation when tab is not visible (saves CPU/battery)
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else {
+        raf = requestAnimationFrame(draw);
+      }
+    };
+
     resize();
     draw();
+    document.addEventListener('visibilitychange', handleVisibility);
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [mounted]);
 
@@ -77,7 +94,7 @@ function ScanlineCanvas() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 z-10 h-full w-full opacity-50"
+      className="gpu-layer pointer-events-none absolute inset-0 z-10 h-full w-full opacity-50"
       aria-hidden="true"
     />
   );
@@ -94,19 +111,20 @@ export function TrendingGrid({ bannerSettings, marqueeText }: TrendingGridProps)
   }
 
   const marqueeItems = React.useMemo(() => {
+    let items = ['BEST OF GENTS HOOD', 'PREMIUM COLLECTIONS'];
     if (marqueeText) {
       const parts = marqueeText
         .split(/[|•]/)
         .map((s) => s.trim())
         .filter(Boolean);
-      if (parts.length > 0) return parts;
+      if (parts.length > 0) items = parts;
     }
-    return [
-      'BEST OF GENTS HOOD',
-      'PREMIUM COLLECTIONS',
-      'BEST OF GENTS HOOD',
-      'PREMIUM COLLECTIONS',
-    ];
+    // Repeat to at least 12 items so each set fills any screen width without empty gaps
+    let list = items;
+    while (list.length < 12) {
+      list = [...list, ...items];
+    }
+    return list;
   }, [marqueeText]);
 
   const isVideo = bannerConfig.mediaType === 'video' && Boolean(bannerConfig.videoUrl);
@@ -266,7 +284,7 @@ export function TrendingGrid({ bannerSettings, marqueeText }: TrendingGridProps)
           >
             <div
               className="animate-marquee-ticker flex items-center whitespace-nowrap"
-              style={{ animationDuration: '14s' }}
+              style={{ animationDuration: '24s' }}
             >
               {/* Set 1 */}
               {marqueeItems.map((text, idx) => (

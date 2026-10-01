@@ -12,7 +12,20 @@ export interface AdminSession {
 export const ADMIN_COOKIE_NAME = 'gh_admin_session';
 
 const getJwtSecret = () => {
-  const secret = process.env.AUTH_SECRET || 'gents-hood-ultra-secure-admin-secret-key-32chars';
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[Security] CRITICAL: AUTH_SECRET environment variable is missing in production!'
+      );
+    }
+    return new TextEncoder().encode('gents-hood-dev-secret-key-do-not-use-in-prod-32c');
+  }
+  if (process.env.NODE_ENV === 'production' && secret.length < 32) {
+    throw new Error(
+      '[Security] CRITICAL: AUTH_SECRET must be at least 32 characters in production!'
+    );
+  }
   return new TextEncoder().encode(secret);
 };
 
@@ -20,7 +33,7 @@ export async function signAdminToken(payload: AdminSession): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime('24h')
     .sign(getJwtSecret());
 }
 

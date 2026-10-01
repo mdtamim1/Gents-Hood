@@ -7,6 +7,8 @@ interface CacheEntry<T> {
 
 const memoryStore = new Map<string, CacheEntry<unknown>>();
 const KEY_PREFIX = 'gh:cache:';
+// Max L1 entries to prevent memory bloat in serverless environments
+const MAX_MEMORY_ENTRIES = 100;
 
 /**
  * Multi-tier cache helper:
@@ -49,7 +51,11 @@ export async function getOrSetCache<T>(
   // 3. Fetch fresh value
   const freshValue = await fetchFn();
 
-  // Populate L1
+  // Populate L1 (with size cap: evict oldest entry if at limit)
+  if (memoryStore.size >= MAX_MEMORY_ENTRIES) {
+    const oldestKey = memoryStore.keys().next().value;
+    if (oldestKey) memoryStore.delete(oldestKey);
+  }
   memoryStore.set(key, {
     value: freshValue,
     expiresAt: now + ttlSeconds * 1000,

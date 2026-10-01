@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCartStore } from '@/store/cart';
@@ -34,16 +35,20 @@ export function Header({ announcementText, announcementsJson }: HeaderProps = {}
 
   useEffect(() => {
     setIsMounted(true);
+    // RAF-throttled scroll handler: max one state update per animation frame
+    let rafId = 0;
     const handleScroll = () => {
-      if (window.scrollY > 10) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setIsScrolled(window.scrollY > 10);
+      });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return (

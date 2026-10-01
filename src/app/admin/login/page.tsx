@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Mail, ArrowRight, Eye, EyeOff, Shield, AlertTriangle } from 'lucide-react';
+import { Turnstile } from '@/components/ui/Turnstile';
 
 function AdminLoginForm() {
   const router = useRouter();
@@ -13,6 +14,7 @@ function AdminLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,7 +32,7 @@ function AdminLoginForm() {
       const res = await fetch('/api/admin/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, turnstileToken }),
       });
 
       const data = await res.json();
@@ -56,9 +58,11 @@ function AdminLoginForm() {
   const reasonMessage =
     reason === 'deactivated'
       ? 'Your account has been deactivated by an administrator.'
-      : reason === 'session_expired' || reason === 'invalid_session'
-        ? 'Your session has expired. Please login again.'
-        : null;
+      : reason === 'idle_timeout'
+        ? 'You were logged out due to inactivity (30 minutes) for security.'
+        : reason === 'session_expired' || reason === 'invalid_session'
+          ? 'Your session has expired. Please login again.'
+          : null;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#080809]">
@@ -82,7 +86,7 @@ function AdminLoginForm() {
       <div className="relative z-10 w-full max-w-sm px-6">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 relative flex h-16 w-44 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white p-2.5 shadow-2xl shadow-black/50">
+          <div className="relative mx-auto mb-4 flex h-16 w-44 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white p-2.5 shadow-2xl shadow-black/50">
             <Image
               src="/images/logo.png"
               alt="Gents Hood Logo"
@@ -162,6 +166,14 @@ function AdminLoginForm() {
                   {error}
                 </div>
               )}
+
+              {/* Cloudflare Turnstile CAPTCHA */}
+              <div className="py-1">
+                <Turnstile
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken('')}
+                />
+              </div>
 
               {/* Submit */}
               <button

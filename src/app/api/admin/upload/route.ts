@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
 
+import { isR2Configured, uploadToR2 } from '@/lib/r2';
+
 export const dynamic = 'force-dynamic';
 
 // Max file size: 10MB
@@ -24,7 +26,10 @@ export async function POST(request: NextRequest) {
 
     if (!canUpload) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: Products or Settings permission required to upload media' },
+        {
+          success: false,
+          error: 'Forbidden: Products or Settings permission required to upload media',
+        },
         { status: 403 }
       );
     }
@@ -37,7 +42,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ success: false, error: 'File too large (max 10MB)' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'File too large (max 10MB)' },
+        { status: 400 }
+      );
     }
 
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -56,22 +64,32 @@ export async function POST(request: NextRequest) {
     const random = Math.random().toString(36).slice(2, 8);
     const filename = `product-${timestamp}-${random}.webp`;
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-    await fs.mkdir(uploadDir, { recursive: true });
-
-    const outputPath = path.join(uploadDir, filename);
-
-    // Compress with sharp → WebP
+    // Compress with sharp → WebP buffer
     // Keep aspect ratio, max width 1920px (so hero banners and gallery images stay crystal sharp), quality 85
-    await sharp(buffer)
+    const webpBuffer = await sharp(buffer)
       .resize({
         width: 1920,
         withoutEnlargement: true, // don't upscale small images
         fit: 'inside',
       })
       .webp({ quality: 85, effort: 4 })
-      .toFile(outputPath);
+      .toBuffer();
+
+    // 1. Direct Cloudflare R2 Upload (Production & Local)
+    if (isR2Configured) {
+      const r2Result = await uploadToR2(webpBuffer, `products/${filename}`, 'image/webp');
+      return NextResponse.json({
+        success: true,
+        url: r2Result.url,
+        filename,
+      });
+    }
+
+    // 2. Fallback to local disk if R2 is not configured
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+    await fs.mkdir(uploadDir, { recursive: true });
+    const outputPath = path.join(uploadDir, filename);
+    await fs.writeFile(outputPath, webpBuffer);
 
     const publicUrl = `/uploads/products/${filename}`;
 
@@ -82,9 +100,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Upload error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to upload image' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Failed to upload image' }, { status: 500 });
   }
 }

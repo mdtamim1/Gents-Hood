@@ -110,30 +110,37 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
       />
 
-      {/* 1. Hero Section (with giant typography & cutout model overlap) */}
+      {/* 1. Hero Section (with giant typography & cutout model overlap) — above fold, renders eagerly */}
       <Hero tagline={siteSettings?.heroTagline} backgroundWord={siteSettings?.heroBackgroundWord} />
 
-      {/* 2. Main Product Gallery Strip (image previews with title and interactive lightbox) */}
+      {/* 2. Main Product Gallery Strip — just below hero, renders eagerly */}
       <GalleryStrip items={galleryItems} />
 
       {/* 3. NEW VIBES Main Product Section (real DB data: pricing, variants, stock) */}
       <FeaturedProduct initialProduct={featuredProduct} />
 
+      {/* 4–6: Below-fold sections — content-visibility: auto skips rendering until scroll approaches */}
       {/* 4. BEST OF GENTS HOOD (Curated Collection Banner with link to /trending) */}
-      <TrendingGrid
-        products={trendingProducts}
-        bannerSettings={typedSettings?.trendingBannerJson}
-        marqueeText={siteSettings?.trendingMarqueeText}
-      />
+      <div className="cv-auto">
+        <TrendingGrid
+          products={trendingProducts}
+          bannerSettings={typedSettings?.trendingBannerJson}
+          marqueeText={siteSettings?.trendingMarqueeText}
+        />
+      </div>
 
       {/* 5. Product Quality & Assurance FAQ (Below Best of Gents Hood) */}
-      <ProductQualityFAQ faqsJson={siteSettings?.faqJson} />
+      <div className="cv-auto">
+        <ProductQualityFAQ faqsJson={siteSettings?.faqJson} />
+      </div>
 
       {/* 6. Style Manifesto Dual Direction Marquee (Directly below FAQ) */}
-      <StyleManifestoMarquee
-        line1={siteSettings?.manifestoLine1}
-        line2={siteSettings?.manifestoLine2}
-      />
+      <div className="cv-auto-sm">
+        <StyleManifestoMarquee
+          line1={siteSettings?.manifestoLine1}
+          line2={siteSettings?.manifestoLine2}
+        />
+      </div>
     </>
   );
 }

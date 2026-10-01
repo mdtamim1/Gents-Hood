@@ -5,22 +5,24 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { signAdminToken, ADMIN_COOKIE_NAME } from '@/lib/auth';
 import { getFirstAllowedPath } from '@/lib/permissions';
-import { rateLimit } from '@/lib/rate-limit';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/services/audit.service';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 import { randomBytes } from 'crypto';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid admin email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  turnstileToken: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+    const ip = getClientIp(request.headers);
     const rate = await rateLimit(`admin_login_${ip}`);
     if (!rate.success) {
       return NextResponse.json(
-        { success: false, error: 'Too many login attempts. Please wait.' },
+        { success: false, error: 'Too many login attempts from this network. Please wait.' },
         { status: 429 }
       );
     }
@@ -35,10 +37,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password } = result.data;
+    const { email, password, turnstileToken } = result.data;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Secondary rate limiting per email (max 5 attempts per 15 min across any IP)
+    const emailRate = await rateLimit(`admin_login_email_${normalizedEmail}`, 5, 15 * 60 * 1000);
+    if (!emailRate.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Too many login attempts for this admin account. Please wait 15 minutes before trying again.',
+        },
+        { status: 429 }
+      );
+    }
+
+    // Cloudflare Turnstile Captcha Verification
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { success: false, error: turnstileCheck.error || 'Captcha verification failed' },
+        { status: 400 }
+      );
+    }
 
     const user = await db.adminUser.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {
@@ -128,7 +153,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24, // 24 hours (1 day) instead of 7 days
     });
 
     return response;

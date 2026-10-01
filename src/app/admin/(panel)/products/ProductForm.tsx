@@ -109,11 +109,18 @@ function ImageUploadBox({
   availableColors: { name: string; hex: string }[];
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [urlMode, setUrlMode] = useState(!image.url.startsWith('/uploads') && !image.url.startsWith('blob'));
+  const isUploaded =
+    image.url.startsWith('/uploads') ||
+    image.url.includes('media.gentshood.com') ||
+    image.url.includes('r2.cloudflarestorage.com') ||
+    image.url.startsWith('blob');
+  const [urlMode, setUrlMode] = useState(!isUploaded && Boolean(image.url));
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   return (
-    <div className={`relative rounded-xl border p-3 transition-all ${isPrimary ? 'border-amber-500/40 bg-amber-500/5' : 'border-white/[0.08] bg-[#1a1a1d]'}`}>
+    <div
+      className={`relative rounded-xl border p-3 transition-all ${isPrimary ? 'border-amber-500/40 bg-amber-500/5' : 'border-white/[0.08] bg-[#1a1a1d]'}`}
+    >
       {isPrimary && (
         <span className="absolute -top-2.5 left-3 rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-400">
           Main Image
@@ -141,7 +148,7 @@ function ImageUploadBox({
         </div>
 
         {/* Controls */}
-        <div className="flex flex-1 flex-col gap-2 min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
           {/* URL / Upload toggle */}
           <div className="flex gap-1">
             <button
@@ -215,9 +222,13 @@ function ImageUploadBox({
               >
                 {image.colorHex ? (
                   <>
-                    <span className="h-3 w-3 flex-shrink-0 rounded-full border border-white/20" style={{ backgroundColor: image.colorHex }} />
+                    <span
+                      className="h-3 w-3 flex-shrink-0 rounded-full border border-white/20"
+                      style={{ backgroundColor: image.colorHex }}
+                    />
                     <span className="flex-1 text-left text-white">
-                      {availableColors.find((c) => c.hex === image.colorHex)?.name || image.colorHex}
+                      {availableColors.find((c) => c.hex === image.colorHex)?.name ||
+                        image.colorHex}
                     </span>
                   </>
                 ) : (
@@ -226,13 +237,18 @@ function ImageUploadBox({
                     <span className="flex-1 text-left text-zinc-500">Map to color (optional)</span>
                   </>
                 )}
-                <ChevronDown className={`h-3 w-3 text-zinc-500 transition-transform ${showColorPicker ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-3 w-3 text-zinc-500 transition-transform ${showColorPicker ? 'rotate-180' : ''}`}
+                />
               </button>
               {showColorPicker && (
                 <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-xl border border-white/[0.12] bg-[#18181b] p-2 shadow-2xl">
                   <button
                     type="button"
-                    onClick={() => { onColorHexChange(null); setShowColorPicker(false); }}
+                    onClick={() => {
+                      onColorHexChange(null);
+                      setShowColorPicker(false);
+                    }}
                     className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-white/[0.06]"
                   >
                     <X className="h-3 w-3" /> No mapping
@@ -241,10 +257,16 @@ function ImageUploadBox({
                     <button
                       key={c.hex}
                       type="button"
-                      onClick={() => { onColorHexChange(c.hex); setShowColorPicker(false); }}
+                      onClick={() => {
+                        onColorHexChange(c.hex);
+                        setShowColorPicker(false);
+                      }}
                       className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-colors hover:bg-white/[0.06] ${image.colorHex === c.hex ? 'text-white' : 'text-zinc-400'}`}
                     >
-                      <span className="h-3 w-3 shrink-0 rounded-full border border-white/20" style={{ backgroundColor: c.hex }} />
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full border border-white/20"
+                        style={{ backgroundColor: c.hex }}
+                      />
                       {c.name}
                     </button>
                   ))}
@@ -338,9 +360,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   // ── Upload image helper
   const uploadImage = useCallback(
     async (file: File, index: number) => {
-      setImages((prev) =>
-        prev.map((img, i) => (i === index ? { ...img, uploading: true } : img))
-      );
+      setImages((prev) => prev.map((img, i) => (i === index ? { ...img, uploading: true } : img)));
       try {
         const fd = new FormData();
         fd.append('file', file);
@@ -349,12 +369,16 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
         setImages((prev) =>
           prev.map((img, i) =>
-            i === index ? { ...img, url: data.url, uploading: false, alt: img.alt || file.name } : img
+            i === index
+              ? { ...img, url: data.url, uploading: false, alt: img.alt || file.name }
+              : img
           )
         );
         showToast('Image uploaded & compressed!', 'success');
       } catch (err: unknown) {
-        setImages((prev) => prev.map((img, i) => (i === index ? { ...img, uploading: false } : img)));
+        setImages((prev) =>
+          prev.map((img, i) => (i === index ? { ...img, uploading: false } : img))
+        );
         showToast(err instanceof Error ? err.message : 'Upload failed', 'danger');
       }
     },
@@ -413,10 +437,22 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   // ── Form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { showToast('Product name is required', 'danger'); return; }
-    if (price <= 0) { showToast('Price must be > 0', 'danger'); return; }
-    if (images.length === 0) { showToast('At least one image is required', 'danger'); return; }
-    if (images.some((img) => !img.url)) { showToast('All image entries need a URL or upload', 'danger'); return; }
+    if (!name.trim()) {
+      showToast('Product name is required', 'danger');
+      return;
+    }
+    if (price <= 0) {
+      showToast('Price must be > 0', 'danger');
+      return;
+    }
+    if (images.length === 0) {
+      showToast('At least one image is required', 'danger');
+      return;
+    }
+    if (images.some((img) => !img.url)) {
+      showToast('All image entries need a URL or upload', 'danger');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -534,7 +570,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     <span className="text-xs font-bold text-white">Flagship Masterpiece</span>
                   </div>
                   <p className="mt-1 text-xs text-white/80">
-                    You are uploading the official Signature Product for the homepage. When published, this piece will immediately be showcased under the Hero & Gallery section on your live storefront.
+                    You are uploading the official Signature Product for the homepage. When
+                    published, this piece will immediately be showcased under the Hero & Gallery
+                    section on your live storefront.
                   </p>
                 </div>
               </div>
@@ -625,7 +663,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                   className="w-full rounded-xl border border-white/[0.08] bg-[#1a1a1d] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-zinc-500"
                 />
               </div>
-
             </div>
           </section>
 
@@ -676,7 +713,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                     Tab 1: DETAILS Content
                   </span>
-                  <span className="text-[10px] text-zinc-500">Controls editorial description + the 2 highlight cards</span>
+                  <span className="text-[10px] text-zinc-500">
+                    Controls editorial description + the 2 highlight cards
+                  </span>
                 </div>
 
                 {/* Full Description */}
@@ -777,7 +816,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                     Tab 2: FABRIC & CARE Content
                   </span>
-                  <span className="text-[10px] text-zinc-500">Controls material composition and washing guide</span>
+                  <span className="text-[10px] text-zinc-500">
+                    Controls material composition and washing guide
+                  </span>
                 </div>
 
                 {/* Fabric Composition */}
@@ -853,7 +894,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                     Tab 3: SILHOUETTE & FIT Content
                   </span>
-                  <span className="text-[10px] text-zinc-500">Controls the fit tag badge and silhouette narrative</span>
+                  <span className="text-[10px] text-zinc-500">
+                    Controls the fit tag badge and silhouette narrative
+                  </span>
                 </div>
 
                 {/* Fit Badge */}
@@ -875,7 +918,14 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                   />
                   {/* Quick preset badge buttons */}
                   <div className="mt-2.5 flex flex-wrap gap-2">
-                    {['True to Size', 'Relaxed Fit', 'Oversized Fit', 'Structured Fit', 'Tailored Regular', 'Slim Fit'].map((b) => (
+                    {[
+                      'True to Size',
+                      'Relaxed Fit',
+                      'Oversized Fit',
+                      'Structured Fit',
+                      'Tailored Regular',
+                      'Slim Fit',
+                    ].map((b) => (
                       <button
                         key={b}
                         type="button"
@@ -886,7 +936,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             : 'border-white/[0.08] bg-white/[0.02] text-zinc-400 hover:border-white/20 hover:text-white'
                         }`}
                       >
-                        {fitBadge === b ? '✓ ' : ''}{b}
+                        {fitBadge === b ? '✓ ' : ''}
+                        {b}
                       </button>
                     ))}
                   </div>
@@ -948,7 +999,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                       className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${colorImageEnabled ? 'translate-x-3' : 'translate-x-0.5'}`}
                     />
                   </div>
-                  <span className="text-[10px] font-semibold text-zinc-400">Color → Image Mapping</span>
+                  <span className="text-[10px] font-semibold text-zinc-400">
+                    Color → Image Mapping
+                  </span>
                   <div title="When enabled, gallery images can be linked to specific colors. Customers will see the matched image when selecting a color.">
                     <Info className="h-3 w-3 text-zinc-600" />
                   </div>
@@ -984,10 +1037,18 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     isPrimary={idx === 0}
                     availableColors={colorImageEnabled ? availableColors : []}
                     onRemove={() => removeImage(idx)}
-                    onAltChange={(v) => setImages((prev) => prev.map((m, i) => i === idx ? { ...m, alt: v } : m))}
-                    onColorHexChange={(v) => setImages((prev) => prev.map((m, i) => i === idx ? { ...m, colorHex: v } : m))}
+                    onAltChange={(v) =>
+                      setImages((prev) => prev.map((m, i) => (i === idx ? { ...m, alt: v } : m)))
+                    }
+                    onColorHexChange={(v) =>
+                      setImages((prev) =>
+                        prev.map((m, i) => (i === idx ? { ...m, colorHex: v } : m))
+                      )
+                    }
                     onUpload={(file) => uploadImage(file, idx)}
-                    onUrlChange={(v) => setImages((prev) => prev.map((m, i) => i === idx ? { ...m, url: v } : m))}
+                    onUrlChange={(v) =>
+                      setImages((prev) => prev.map((m, i) => (i === idx ? { ...m, url: v } : m)))
+                    }
                   />
                 ))}
               </div>
@@ -1041,7 +1102,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                           className="rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-zinc-500"
                         >
                           {SIZES.map((s) => (
-                            <option key={s} value={s}>{s}</option>
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
                           ))}
                         </select>
                       </td>
@@ -1145,7 +1208,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 />
                 <div>
                   <span className="text-xs font-bold text-white">Show in Trending</span>
-                  <p className="text-[10px] text-zinc-500">Displays in &quot;Best of Gents Hood&quot; grid</p>
+                  <p className="text-[10px] text-zinc-500">
+                    Displays in &quot;Best of Gents Hood&quot; grid
+                  </p>
                 </div>
               </label>
             </div>
@@ -1173,10 +1238,23 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
               {images.length > 1 && (
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                   {images.slice(1).map((img, i) => (
-                    <div key={i} className="relative h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-zinc-800">
-                      {img.url && <Image src={img.url} alt={img.alt || `gallery ${i + 2}`} fill className="object-cover" />}
+                    <div
+                      key={i}
+                      className="relative h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-zinc-800"
+                    >
+                      {img.url && (
+                        <Image
+                          src={img.url}
+                          alt={img.alt || `gallery ${i + 2}`}
+                          fill
+                          className="object-cover"
+                        />
+                      )}
                       {img.colorHex && colorImageEnabled && (
-                        <div className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-white/30" style={{ backgroundColor: img.colorHex }} />
+                        <div
+                          className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-white/30"
+                          style={{ backgroundColor: img.colorHex }}
+                        />
                       )}
                     </div>
                   ))}
@@ -1196,7 +1274,10 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
               </h2>
               <div className="flex flex-wrap gap-2">
                 {availableColors.map((c) => (
-                  <div key={c.hex} className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5">
+                  <div
+                    key={c.hex}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5"
+                  >
                     <span
                       className="h-3 w-3 rounded-full border border-white/20"
                       style={{ backgroundColor: c.hex }}

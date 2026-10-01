@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,9 +28,12 @@ const createStaffSchema = z.object({
 // GET: List all staff (OWNER only)
 export async function GET(_request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session || session.role !== 'OWNER') {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    const auth = await verifyAdminAccess();
+    if (!auth.authorized || auth.user.role !== 'OWNER') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: OWNER role required' },
+        { status: 403 }
+      );
     }
 
     const staff = await db.adminUser.findMany({
@@ -79,9 +82,12 @@ export async function GET(_request: NextRequest) {
 // POST: Create new staff (OWNER only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getAdminSession();
-    if (!session || session.role !== 'OWNER') {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    const auth = await verifyAdminAccess();
+    if (!auth.authorized || auth.user.role !== 'OWNER') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: OWNER role required' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

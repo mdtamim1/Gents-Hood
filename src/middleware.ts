@@ -5,7 +5,13 @@ import { jwtVerify } from 'jose';
 const ADMIN_COOKIE_NAME = 'gh_admin_session';
 
 const getJwtSecret = () => {
-  const secret = process.env.AUTH_SECRET || 'gents-hood-ultra-secure-admin-secret-key-32chars';
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      return null;
+    }
+    return new TextEncoder().encode('gents-hood-dev-secret-key-do-not-use-in-prod-32c');
+  }
   return new TextEncoder().encode(secret);
 };
 
@@ -43,12 +49,34 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/admin/auth/login') &&
     !pathname.startsWith('/api/admin/orders/midnight-reset')
   ) {
+    // CSRF / Origin validation for state-changing requests
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+      const origin = request.headers.get('origin');
+      if (origin && process.env.NODE_ENV === 'production') {
+        const isAllowedOrigin =
+          origin === 'https://admin.gentshood.com' ||
+          origin === 'https://gentshood.com' ||
+          origin === 'https://www.gentshood.com' ||
+          origin.endsWith('.gentshood.com');
+        if (!isAllowedOrigin) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Cross-site request rejected' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
+    const jwtSecret = getJwtSecret();
+    if (!jwtSecret) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
     try {
-      const { payload } = await jwtVerify(token, getJwtSecret());
+      const { payload } = await jwtVerify(token, jwtSecret);
 
       // Check if user is active via the token's role/id
       // Full session validation happens in individual route handlers
@@ -68,9 +96,10 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
 
     let isAuthenticated = false;
-    if (token) {
+    const jwtSecret = getJwtSecret();
+    if (token && jwtSecret) {
       try {
-        await jwtVerify(token, getJwtSecret());
+        await jwtVerify(token, jwtSecret);
         isAuthenticated = true;
       } catch {
         isAuthenticated = false;

@@ -224,8 +224,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               ref={thumbnailScrollRef}
               onTouchStart={handleThumbTouchStart}
               onTouchEnd={handleThumbTouchEnd}
-              className="flex gap-2 overflow-x-auto pb-2 sm:flex-col sm:overflow-y-auto sm:overflow-x-hidden sm:pb-0"
-              style={{ scrollbarWidth: 'none', maxHeight: 'calc(4 * 84px + 3 * 8px)' }}
+              className="no-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden py-1 sm:flex-col sm:overflow-y-auto sm:overflow-x-hidden sm:py-0"
+              style={{ maxHeight: 'calc(4 * 84px + 3 * 8px)' }}
             >
               {images.map((img, idx) => (
                 <button
@@ -757,8 +757,16 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Cut & Drape', value: product.cutDrape || 'Relaxed Drop Shoulder', icon: '↗' },
-                    { label: 'Hardware', value: product.hardware || 'Concealed Heavy Placket', icon: '⚙' },
+                    {
+                      label: 'Cut & Drape',
+                      value: product.cutDrape || 'Relaxed Drop Shoulder',
+                      icon: '↗',
+                    },
+                    {
+                      label: 'Hardware',
+                      value: product.hardware || 'Concealed Heavy Placket',
+                      icon: '⚙',
+                    },
                   ].map(({ label, value, icon }) => (
                     <div
                       key={label}

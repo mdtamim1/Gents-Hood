@@ -164,6 +164,10 @@ export async function rateLimit(
  * Extract the real client IP from standard proxy headers.
  */
 export function getClientIp(headers: Headers): string {
+  const cfConnectingIp = headers.get('cf-connecting-ip');
+  if (cfConnectingIp) {
+    return cfConnectingIp.trim();
+  }
   const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
     return forwardedFor.split(',')[0].trim();

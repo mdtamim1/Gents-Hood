@@ -12,7 +12,6 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
   const [isQuickSizeOpen, setIsQuickSizeOpen] = useState(false);
   const [isQuickAnimating, setIsQuickAnimating] = useState(false);
 
@@ -35,11 +34,7 @@ export function ProductCard({ product }: ProductCardProps) {
     : 0;
 
   return (
-    <div
-      className="group relative flex flex-col"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <div className="group relative flex flex-col">
       {/* 3:4 Image Container */}
       <div className="relative aspect-[3/4] w-full select-none overflow-hidden border border-line bg-cream-soft">
         <Link
@@ -47,27 +42,25 @@ export function ProductCard({ product }: ProductCardProps) {
           aria-label={`View details for ${product.name}`}
           className="absolute inset-0 block"
         >
-          {/* Primary Image */}
+          {/* Primary Image - CSS group-hover handles fade/scale without JS re-renders */}
           <Image
             src={primaryImage}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 320px"
             className={`object-cover object-center transition-all duration-500 ease-out ${
-              hasMultipleImages && isHovered ? 'scale-105 opacity-0' : 'scale-100 opacity-100'
+              hasMultipleImages ? 'group-hover:scale-105 group-hover:opacity-0' : ''
             }`}
           />
 
-          {/* Secondary Image on Hover */}
+          {/* Secondary Image on Hover - CSS group-hover reveals it */}
           {hasMultipleImages && (
             <Image
               src={secondaryImage}
               alt={`${product.name} alternate view`}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 320px"
-              className={`absolute inset-0 object-cover object-center transition-all duration-500 ease-out ${
-                isHovered ? 'scale-105 opacity-100' : 'scale-100 opacity-0'
-              }`}
+              className="absolute inset-0 object-cover object-center opacity-0 transition-all duration-500 ease-out group-hover:scale-105 group-hover:opacity-100"
             />
           )}
         </Link>
@@ -79,12 +72,8 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
-        {/* Quick Add Bar (Always visible on mobile, slide-up on desktop hover) */}
-        <div
-          className={`absolute inset-x-0 bottom-0 z-10 translate-y-0 transition-transform duration-300 ease-out sm:group-hover:translate-y-0 ${
-            isHovered ? 'sm:translate-y-0' : 'sm:translate-y-full'
-          }`}
-        >
+        {/* Quick Add Bar - always visible on mobile, CSS group-hover slides up on desktop */}
+        <div className="absolute inset-x-0 bottom-0 z-10 translate-y-0 transition-transform duration-300 ease-out sm:translate-y-full sm:group-hover:translate-y-0">
           <button
             type="button"
             onClick={handleOpenQuickSize}

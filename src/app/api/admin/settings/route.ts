@@ -63,7 +63,13 @@ export async function GET() {
     const auth = await verifyAdminAccess('settings');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Settings permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Settings permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -84,7 +90,13 @@ export async function PUT(request: NextRequest) {
     const auth = await verifyAdminAccess('settings');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Settings permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Settings permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -122,6 +134,7 @@ export async function PUT(request: NextRequest) {
       announcementsJson: data.announcementsJson,
     });
 
+    revalidatePath('/', 'layout');
     revalidatePath('/');
     revalidatePath('/contact');
 

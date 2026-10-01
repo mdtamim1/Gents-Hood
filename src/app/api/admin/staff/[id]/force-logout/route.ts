@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { getAdminSession } from '@/lib/auth';
+import { verifyAdminAccess } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getAdminSession();
-    if (!session || session.role !== 'OWNER') {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    const auth = await verifyAdminAccess();
+    if (!auth.authorized || auth.user.role !== 'OWNER') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: OWNER role required' },
+        { status: 403 }
+      );
     }
 
     // Deactivate all sessions

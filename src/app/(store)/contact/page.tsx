@@ -132,20 +132,6 @@ export default async function ContactPage() {
                 </div>
               </div>
             </div>
-
-            {/* Map Embed */}
-            <div className="overflow-hidden rounded-[1px] border border-line bg-cream-soft">
-              <iframe
-                title="Gents Hood Atelier Location"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14602.700318625907!2d90.40733855!3d23.79458215!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755c70c15ea1de1%3A0x97856381e3399a07!2sGulshan%2C%20Dhaka!5e0!3m2!1sen!2sbd!4v1700000000000!5m2!1sen!2sbd"
-                width="100%"
-                height="220"
-                style={{ border: 0, filter: 'grayscale(0.6) contrast(1.1)' }}
-                allowFullScreen={false}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
           </div>
 
           {/* Right: Message Form */}

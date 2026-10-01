@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ShieldAlert,
@@ -72,7 +72,9 @@ export function AppealsPageClient({
 }: AppealsPageClientProps) {
   const [appeals, setAppeals] = useState<AppealItem[]>(initialAppeals);
   const [counts, setCounts] = useState(initialCounts);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>(
+    'PENDING'
+  );
   const [search, setSearch] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionModal, setActionModal] = useState<{
@@ -96,12 +98,42 @@ export function AppealsPageClient({
     }
   };
 
+  // Live auto-refresh every 4s + instant on window focus
+  useEffect(() => {
+    if (search.trim()) return;
+
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAppeals();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshAppeals();
+      }
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+    };
+  }, [search]);
+
   const showToast = (msg: string) => {
     setSuccessToast(msg);
     setTimeout(() => setSuccessToast(null), 4000);
   };
 
-  const handleReviewAction = async (appealId: string, action: 'APPROVE' | 'REJECT', note?: string) => {
+  const handleReviewAction = async (
+    appealId: string,
+    action: 'APPROVE' | 'REJECT',
+    note?: string
+  ) => {
     setProcessingId(appealId);
     try {
       const res = await fetch(`/api/admin/appeals/${appealId}`, {
@@ -145,7 +177,8 @@ export function AppealsPageClient({
           appeal.order.shippingPhone.includes(q) ||
           (appeal.customerPhone && appeal.customerPhone.includes(q));
         const matchesStaff = appeal.staffName.toLowerCase().includes(q);
-        const matchesReason = appeal.reason.toLowerCase().includes(q) || appeal.note.toLowerCase().includes(q);
+        const matchesReason =
+          appeal.reason.toLowerCase().includes(q) || appeal.note.toLowerCase().includes(q);
         if (!matchesOrder && !matchesStaff && !matchesReason) return false;
       }
 
@@ -181,10 +214,13 @@ export function AppealsPageClient({
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
               <ShieldAlert className="h-4 w-4" />
             </span>
-            <h1 className="text-xl font-bold tracking-tight text-white">Order Appeals & Issue Desk</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">
+              Order Appeals & Issue Desk
+            </h1>
           </div>
           <p className="mt-1 text-[12px] text-white/40">
-            Staff submit customer complaint appeals here. Admin verifies and approves directly into the staff&apos;s processing queue.
+            Staff submit customer complaint appeals here. Admin verifies and approves directly into
+            the staff&apos;s processing queue.
           </p>
         </div>
 
@@ -409,14 +445,16 @@ export function AppealsPageClient({
                       </p>
                       <div className="mt-1.5 space-y-1">
                         <p className="font-semibold text-white">{appeal.order.shippingName}</p>
-                        <div className="flex items-center gap-1.5 text-white/60 font-mono text-[11px]">
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] text-white/60">
                           <Phone className="h-3 w-3 text-white/30" />
                           <span>{appeal.customerPhone || appeal.order.shippingPhone}</span>
                         </div>
                         {appeal.order.shippingDistrict && (
                           <p className="text-[11px] text-white/40">
                             {appeal.order.shippingDistrict}
-                            {appeal.order.shippingAddress ? ` · ${appeal.order.shippingAddress}` : ''}
+                            {appeal.order.shippingAddress
+                              ? ` · ${appeal.order.shippingAddress}`
+                              : ''}
                           </p>
                         )}
                       </div>
@@ -475,15 +513,20 @@ export function AppealsPageClient({
                             {isApproved ? '✓ Admin Approved & Transferred' : '✕ Admin Rejected'}
                           </span>
                           {appeal.reviewedAt && (
-                            <span className="text-[10px] opacity-75">{formatDate(appeal.reviewedAt)}</span>
+                            <span className="text-[10px] opacity-75">
+                              {formatDate(appeal.reviewedAt)}
+                            </span>
                           )}
                         </div>
                         {appeal.adminNote && (
-                          <p className="mt-1 text-white/80 italic">&ldquo;{appeal.adminNote}&rdquo;</p>
+                          <p className="mt-1 italic text-white/80">
+                            &ldquo;{appeal.adminNote}&rdquo;
+                          </p>
                         )}
                         {isApproved && (
                           <p className="mt-1 font-semibold text-emerald-400">
-                            → Order set to PROCESSING and assigned to {appeal.staffName}&apos;s panel.
+                            → Order set to PROCESSING and assigned to {appeal.staffName}&apos;s
+                            panel.
                           </p>
                         )}
                       </div>
@@ -527,7 +570,10 @@ export function AppealsPageClient({
       {/* Review Modal (Approve / Reject Dialog) */}
       {actionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setActionModal(null)} />
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            onClick={() => setActionModal(null)}
+          />
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111113] p-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <h3 className="text-[15px] font-bold text-white">
@@ -557,7 +603,8 @@ export function AppealsPageClient({
                 <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-[12px] text-red-300">
                   <p className="font-semibold">Reject Appeal:</p>
                   <p className="mt-1 text-red-200/80">
-                    The appeal will be marked as rejected. Staff will be informed with your note below.
+                    The appeal will be marked as rejected. Staff will be informed with your note
+                    below.
                   </p>
                 </div>
               )}
