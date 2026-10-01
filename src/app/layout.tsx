@@ -77,11 +77,11 @@ export const metadata: Metadata = {
       'Fashion that moves with you. Discover curated menswear crafted for effortless movement and timeless presence.',
     images: [
       {
-        url: `${siteUrl}/images/logo.png`,
-        width: 800,
-        height: 800,
-        alt: 'Gents Hood Official Logo',
-        type: 'image/png',
+        url: `${siteUrl}/images/og-image.jpg`,
+        width: 1200,
+        height: 630,
+        alt: 'Gents Hood | Premium Menswear & Editorial Streetwear',
+        type: 'image/jpeg',
       },
       {
         url: `${siteUrl}/images/gentshood-collection-banner.jpg`,
@@ -90,13 +90,20 @@ export const metadata: Metadata = {
         alt: 'Gents Hood Premium Menswear & Editorial Streetwear',
         type: 'image/jpeg',
       },
+      {
+        url: `${siteUrl}/images/logo.png`,
+        width: 695,
+        height: 282,
+        alt: 'Gents Hood Official Logo',
+        type: 'image/png',
+      },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Gents Hood | Premium Menswear & Editorial Streetwear',
     description: 'Fashion that moves with you. Curated premium menswear and essentials.',
-    images: [`${siteUrl}/images/logo.png`],
+    images: [`${siteUrl}/images/og-image.jpg`],
   },
   verification: {
     google:
