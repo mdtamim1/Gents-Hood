@@ -18,6 +18,14 @@ function AdminLoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleTurnstileVerify = React.useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpire = React.useCallback(() => {
+    setTurnstileToken('');
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -169,10 +177,7 @@ function AdminLoginForm() {
 
               {/* Cloudflare Turnstile CAPTCHA */}
               <div className="py-1">
-                <Turnstile
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken('')}
-                />
+                <Turnstile onVerify={handleTurnstileVerify} onExpire={handleTurnstileExpire} />
               </div>
 
               {/* Submit */}

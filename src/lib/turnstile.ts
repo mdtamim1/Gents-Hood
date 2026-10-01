@@ -6,7 +6,7 @@ export async function verifyTurnstileToken(
   token: string | null | undefined,
   remoteIp?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  const secretKey = process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAFLI5XqHXfU0MdL3dgsWmHxWb9s';
 
   // In local development or if not configured, pass safely
   if (!secretKey) {
