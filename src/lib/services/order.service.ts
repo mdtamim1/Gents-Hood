@@ -150,10 +150,24 @@ export async function createOrder(input: CreateOrderInput) {
     const normalizedPhone =
       rawPhone.startsWith('8801') && rawPhone.length === 13 ? rawPhone.slice(2) : rawPhone;
 
+    // 3.5 Find or create customer by phone
+    let customer = await tx.customer.findUnique({
+      where: { phone: normalizedPhone },
+    });
+    if (!customer) {
+      customer = await tx.customer.create({
+        data: {
+          name: input.shippingName,
+          phone: normalizedPhone,
+        },
+      });
+    }
+
     // 4. Create Order Record
     const order = await tx.order.create({
       data: {
         orderNo,
+        customerId: customer.id,
         status: 'PENDING',
         paymentMethod: input.paymentMethod || 'COD',
         paymentStatus: 'UNPAID',

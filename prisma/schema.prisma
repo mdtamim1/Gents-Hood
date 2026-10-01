@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // Tables
@@ -27,7 +28,6 @@ model Product {
   hardware         String?          // e.g. "Concealed Storm Placket" or "YKK Zippers"
   fitBadge         String?          @default("True to Size") // e.g. "True to Size", "Oversized Fit"
   sizeChartJson    String?
-  tagsJson         String?
   seoTitle         String?
   seoDescription   String?
   createdAt        DateTime         @default(now())
@@ -102,25 +102,8 @@ model Customer {
   updatedAt DateTime  @updatedAt
 
   orders    Order[]
-  addresses Address[]
 
   @@index([phone])
-}
-
-model Address {
-  id          String   @id @default(cuid())
-  customerId  String
-  fullName    String
-  phone       String
-  district    String
-  area        String
-  addressLine String
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
 }
 
 model Order {
@@ -135,7 +118,6 @@ model Order {
   discount          Int                  @default(0)
   manualDiscount    Int                  @default(0)
   paidAmount        Int                  @default(0)
-  couponCode        String?
   total             Int
   shippingName      String
   shippingPhone     String

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { formatPrice } from '@/lib/utils/money';
@@ -49,11 +49,6 @@ export default function AccountPage() {
 
         setOrders(data.orders);
         setHasSearched(true);
-        try {
-          localStorage.setItem('gents_hood_user_phone', mobilePhone);
-        } catch {
-          // Ignore
-        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to retrieve order history.';
         showToast(msg, 'danger');
@@ -63,18 +58,6 @@ export default function AccountPage() {
     },
     [showToast]
   );
-
-  useEffect(() => {
-    try {
-      const savedPhone = localStorage.getItem('gents_hood_user_phone');
-      if (savedPhone) {
-        setPhone(savedPhone);
-        fetchOrders(savedPhone);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [fetchOrders]);
 
   const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();

@@ -4,6 +4,8 @@
  * graceful Redis/Upstash connection when configured.
  */
 
+import { redis } from './redis';
+
 export interface RateLimitResult {
   success: boolean;
   limit: number;
@@ -60,8 +62,12 @@ function cleanupStaleEntries(now: number) {
   }
 }
 
+const REDIS_RATE_PREFIX = 'gh:ratelimit:';
+
 /**
  * Check and record a rate-limit consumption for a given identifier.
+ * Uses Upstash Redis when available for distributed rate limiting across serverless lambdas,
+ * with a seamless fallback to in-memory sliding window.
  *
  * @param identifier Unique key (e.g., `order_192.168.1.1` or `admin_login_user@example.com`)
  * @param customLimit Optional custom limit
@@ -73,7 +79,6 @@ export async function rateLimit(
   customWindowMs?: number
 ): Promise<RateLimitResult> {
   const now = Date.now();
-  cleanupStaleEntries(now);
 
   // Resolve config: custom -> route prefix match -> default
   let config: RateLimitConfig = DEFAULT_CONFIG;
@@ -87,7 +92,47 @@ export async function rateLimit(
   const limit = customLimit ?? config.limit;
   const windowMs = customWindowMs ?? config.windowMs;
 
-  // In-memory sliding window evaluation
+  // 1. Try Upstash Redis for distributed multi-instance rate limiting
+  if (redis) {
+    try {
+      const redisKey = `${REDIS_RATE_PREFIX}${identifier}`;
+      const windowStart = now - windowMs;
+
+      const pipe = redis.pipeline();
+      pipe.zremrangebyscore(redisKey, 0, windowStart);
+      pipe.zcard(redisKey);
+      pipe.zadd(redisKey, {
+        score: now,
+        member: `${now}-${Math.random().toString(36).slice(2, 7)}`,
+      });
+      pipe.expire(redisKey, Math.max(60, Math.ceil(windowMs / 1000) * 2));
+
+      const results = await pipe.exec();
+      const currentCount = (results[1] as number) || 0;
+
+      if (currentCount >= limit) {
+        return {
+          success: false,
+          limit,
+          remaining: 0,
+          reset: now + windowMs,
+        };
+      }
+
+      return {
+        success: true,
+        limit,
+        remaining: Math.max(0, limit - currentCount - 1),
+        reset: now + windowMs,
+      };
+    } catch (e) {
+      console.warn(`[Redis RateLimit] Fallback to memory for "${identifier}":`, e);
+    }
+  }
+
+  // 2. Fallback to in-memory sliding window evaluation
+  cleanupStaleEntries(now);
+
   const timestamps = memoryStore.get(identifier) || [];
   const windowStart = now - windowMs;
   const activeTimestamps = timestamps.filter((ts) => ts > windowStart);

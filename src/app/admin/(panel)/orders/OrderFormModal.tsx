@@ -124,7 +124,6 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     deliveryCharge: typeof editOrder?.deliveryCharge === 'number' ? editOrder.deliveryCharge : 120,
     manualDiscount: (editOrder?.manualDiscount as number) || 0,
     paidAmount: (editOrder?.paidAmount as number) || 0,
-    couponCode: (editOrder?.couponCode as string) || '',
   });
 
   // Date formatted for date input
@@ -417,7 +416,6 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
           deliveryCharge: Number(form.deliveryCharge) || 0,
           manualDiscount: Number(form.manualDiscount) || 0,
           paidAmount: Number(form.paidAmount) || 0,
-          couponCode: form.couponCode,
           subtotal,
           total,
           items: items,
@@ -780,7 +778,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                           <div
                             key={product.id}
                             onClick={() => handleSelectProduct(product)}
-                            className="flex cursor-pointer items-center justify-between border-b border-white/[0.04] p-2.5 transition-colors hover:bg-white/[0.04] last:border-0"
+                            className="flex cursor-pointer items-center justify-between border-b border-white/[0.04] p-2.5 transition-colors last:border-0 hover:bg-white/[0.04]"
                           >
                             <div className="flex min-w-0 items-center gap-2.5">
                               {product.images?.[0] ? (
@@ -833,7 +831,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
 
                   {/* AUTOMATED PRODUCT CONFIGURATOR PANEL */}
                   {selectedProduct && (
-                    <div className="mt-3 rounded-xl border border-amber-500/30 bg-[#161619] p-3.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="animate-in fade-in zoom-in-95 mt-3 rounded-xl border border-amber-500/30 bg-[#161619] p-3.5 shadow-xl duration-150">
                       {/* Product Header */}
                       <div className="flex items-start justify-between gap-2 border-b border-white/[0.06] pb-2.5">
                         <div className="flex items-center gap-2.5">
@@ -853,7 +851,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                             <h4 className="line-clamp-1 text-xs font-bold text-white">
                               {selectedProduct.name}
                             </h4>
-                            <p className="text-[11px] font-mono text-amber-400">
+                            <p className="font-mono text-[11px] text-amber-400">
                               ৳{activePrice.toLocaleString()}{' '}
                               <span className="text-[10px] text-zinc-400">
                                 ({isOutOfStock ? 'Out of stock' : `${activeStock} available`})
@@ -1172,25 +1170,6 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                   </div>
 
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">Coupon</span>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={form.couponCode}
-                        onChange={(e) => setForm((f) => ({ ...f, couponCode: e.target.value }))}
-                        placeholder="CODE"
-                        className="w-24 rounded border border-white/[0.08] bg-[#141416] px-2 py-1 text-center font-mono text-xs uppercase text-white placeholder-zinc-500 outline-none"
-                      />
-                      <button
-                        type="button"
-                        className="rounded border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-white/10 hover:text-white"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
                     <span className="text-zinc-400">Manual Discount (৳)</span>
                     <input
                       type="number"
@@ -1308,7 +1287,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">Order Activity History</h3>
-                  <p className="text-[11px] font-mono text-zinc-400">Invoice: {invoiceNo}</p>
+                  <p className="font-mono text-[11px] text-zinc-400">Invoice: {invoiceNo}</p>
                 </div>
               </div>
               <button
@@ -1390,9 +1369,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                           </div>
                         )}
                         {log.note && (
-                          <p className="text-[11px] text-zinc-300/80">
-                            &ldquo;{log.note}&rdquo;
-                          </p>
+                          <p className="text-[11px] text-zinc-300/80">&ldquo;{log.note}&rdquo;</p>
                         )}
                       </div>
                     </div>

@@ -3,5 +3,11 @@
   "framework": "nextjs",
   "regions": ["sin1"],
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "crons": [
+    {
+      "path": "/api/admin/orders/midnight-reset",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }

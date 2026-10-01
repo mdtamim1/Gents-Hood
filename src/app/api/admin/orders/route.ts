@@ -10,7 +10,11 @@ export async function GET(request: NextRequest) {
     const auth = await verifyAdminAccess('orders');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -35,8 +39,6 @@ export async function GET(request: NextRequest) {
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
       whereClause.createdAt = { gte: startOfDay, lt: endOfDay };
     }
-
-
 
     // Scoping:
     // If not OWNER and NOT searching: staff only sees their own assigned orders
@@ -97,7 +99,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch live staff online status if OWNER
-    let staffList: Array<{ id: string; name: string; displayColor: string; isOnline: boolean }> = [];
+    let staffList: Array<{ id: string; name: string; displayColor: string; isOnline: boolean }> =
+      [];
     if (session.role === 'OWNER') {
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
       const [allStaff, activeSessions] = await Promise.all([
@@ -147,7 +150,11 @@ export async function POST(request: NextRequest) {
     const auth = await verifyAdminAccess('orders');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -214,7 +221,6 @@ export async function POST(request: NextRequest) {
         discount,
         manualDiscount: body.manualDiscount || 0,
         paidAmount: body.paidAmount || 0,
-        couponCode: body.couponCode || null,
         total,
         shippingName: body.shippingName,
         shippingPhone: body.shippingPhone,
