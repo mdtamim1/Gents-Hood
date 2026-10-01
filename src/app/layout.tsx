@@ -24,7 +24,10 @@ const playfair = Playfair_Display({
   weight: ['500', '600', '700', '800', '900'],
 });
 
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+const siteUrl =
+  process.env.NODE_ENV === 'production'
+    ? 'https://gentshood.com'
+    : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
 
 export const viewport: Viewport = {
   themeColor: '#171718',
@@ -40,17 +43,20 @@ export const metadata: Metadata = {
     template: '%s | Gents Hood',
   },
   description:
-    'Fashion that moves with you. Elevate your everyday wardrobe with Gents Hood premium menswear, overcoats, jackets, and essentials.',
+    'Fashion that moves with you. Elevate your everyday wardrobe with Gents Hood premium menswear, overcoats, jackets, and essentials in Bangladesh.',
   keywords: [
     'Gents Hood',
+    'Gents Hood Bangladesh',
     'Menswear Bangladesh',
     'Premium Mens Fashion Dhaka',
     'Streetwear Bangladesh',
-    'Winter Overcoats',
-    'Tailored Jackets',
+    'Winter Overcoats Dhaka',
+    'Tailored Jackets Bangladesh',
     'Editorial Menswear',
+    'Men Clothing Brand BD',
+    'Online Mens Shop Dhaka',
   ],
-  authors: [{ name: 'Gents Hood' }],
+  authors: [{ name: 'Gents Hood', url: siteUrl }],
   creator: 'Gents Hood',
   publisher: 'Gents Hood',
   formatDetection: {
@@ -71,10 +77,18 @@ export const metadata: Metadata = {
       'Fashion that moves with you. Discover curated menswear crafted for effortless movement and timeless presence.',
     images: [
       {
-        url: '/images/hero-model.png',
+        url: `${siteUrl}/images/logo.png`,
+        width: 800,
+        height: 800,
+        alt: 'Gents Hood Official Logo',
+        type: 'image/png',
+      },
+      {
+        url: `${siteUrl}/images/gentshood-collection-banner.jpg`,
         width: 1200,
         height: 630,
-        alt: 'Gents Hood Premium Menswear',
+        alt: 'Gents Hood Premium Menswear & Editorial Streetwear',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -82,7 +96,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Gents Hood | Premium Menswear & Editorial Streetwear',
     description: 'Fashion that moves with you. Curated premium menswear and essentials.',
-    images: ['/images/hero-model.png'],
+    images: [`${siteUrl}/images/logo.png`],
+  },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
   },
   robots: {
     index: true,

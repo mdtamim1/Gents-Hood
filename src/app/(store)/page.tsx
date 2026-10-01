@@ -19,7 +19,10 @@ export default async function HomePage() {
     getTrendingProducts(8),
   ]);
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+  const siteUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://gentshood.com'
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
 
   let parsedSocial: Record<string, string> = {};
   if (siteSettings?.socialLinks) {
@@ -47,7 +50,7 @@ export default async function HomePage() {
     '@type': 'Organization',
     name: 'Gents Hood',
     url: siteUrl,
-    logo: `${siteUrl}/images/hero-model.png`,
+    logo: `${siteUrl}/images/logo.png`,
     sameAs: [
       parsedSocial.facebook,
       parsedSocial.instagram,

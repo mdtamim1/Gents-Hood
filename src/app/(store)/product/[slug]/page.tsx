@@ -30,30 +30,73 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   if (!product) {
     return {
-      title: 'Product Not Found | Gents Hood',
+      title: 'Product Not Found',
     };
   }
 
+  const siteUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://gentshood.com'
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+
+  const toAbsoluteUrl = (url: string) => {
+    if (!url) return `${siteUrl}/images/logo.png`;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${siteUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   const primaryImage = product.images[0]?.url || '/images/gallery-front.jpg';
+  const absolutePrimaryImage = toAbsoluteUrl(primaryImage);
+
+  const ogImages =
+    product.images.length > 0
+      ? product.images.map((img) => ({
+          url: toAbsoluteUrl(img.url),
+          width: 1200,
+          height: 1200,
+          alt: `${product.name} — Gents Hood`,
+        }))
+      : [
+          {
+            url: absolutePrimaryImage,
+            width: 1200,
+            height: 1200,
+            alt: product.name,
+          },
+        ];
+
+  const canonicalUrl = `${siteUrl}/product/${product.slug}`;
+  const description =
+    product.shortDescription ||
+    product.description ||
+    `Order ${product.name} at Gents Hood. Premium fabrics, tailored fit, nationwide delivery in Bangladesh.`;
 
   return {
-    title: `${product.name} | Gents Hood Menswear`,
-    description:
-      product.shortDescription ||
-      product.description ||
-      'Premium menswear engineered for modern style.',
+    title: product.name,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
       title: `${product.name} — Gents Hood`,
-      description:
-        product.shortDescription || 'Discover premium menswear crafted for effortless movement.',
-      images: [
-        {
-          url: primaryImage,
-          width: 1200,
-          height: 1600,
-          alt: product.name,
-        },
-      ],
+      description,
+      url: canonicalUrl,
+      siteName: 'Gents Hood',
+      locale: 'en_US',
+      type: 'website',
+      images: ogImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${product.name} | Gents Hood`,
+      description,
+      images: [absolutePrimaryImage],
+    },
+    other: {
+      'product:price:amount': String(product.price),
+      'product:price:currency': 'BDT',
+      'product:availability': product.status === 'ACTIVE' ? 'in stock' : 'out of stock',
+      'product:brand': 'Gents Hood',
     },
   };
 }
@@ -68,15 +111,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  const siteUrl =
+    process.env.NODE_ENV === 'production'
+      ? 'https://gentshood.com'
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+
+  const toAbsoluteUrl = (url: string) => {
+    if (!url) return `${siteUrl}/images/logo.png`;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${siteUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   // Filter out the current product from recommendations if present
   const related = recommendations.filter((p) => p.id !== product.id).slice(0, 4);
 
-  // Schema.org Product JSON-LD for Search Engine Optimization
-  const jsonLd = {
+  // Schema.org Product JSON-LD for Google Search Rich Results
+  const productJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    image: product.images.map((img) => img.url),
+    image: product.images.map((img) => toAbsoluteUrl(img.url)),
     description: product.shortDescription || product.description,
     sku: product.sku || product.id,
     brand: {
@@ -87,9 +141,44 @@ export default async function ProductPage({ params }: ProductPageProps) {
       '@type': 'Offer',
       priceCurrency: 'BDT',
       price: product.price,
-      availability: 'https://schema.org/InStock',
+      priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      availability:
+        product.status === 'ACTIVE'
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
       itemCondition: 'https://schema.org/NewCondition',
+      url: `${siteUrl}/product/${product.slug}`,
+      seller: {
+        '@type': 'Organization',
+        name: 'Gents Hood',
+      },
     },
+  };
+
+  // Schema.org BreadcrumbList for Google SERP
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: siteUrl,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Trending',
+        item: `${siteUrl}/trending`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: product.name,
+        item: `${siteUrl}/product/${product.slug}`,
+      },
+    ],
   };
 
   return (
@@ -97,7 +186,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {/* Schema.org Structured Data */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <main className="py-10 sm:py-16">
