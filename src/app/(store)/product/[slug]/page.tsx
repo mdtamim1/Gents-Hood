@@ -155,7 +155,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     },
   };
 
-  // Schema.org BreadcrumbList for Google SERP
+  // Schema.org BreadcrumbList for Google Search Results
   const breadcrumbJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
