@@ -77,7 +77,7 @@ export const metadata: Metadata = {
       'Fashion that moves with you. Discover curated menswear crafted for effortless movement and timeless presence.',
     images: [
       {
-        url: `${siteUrl}/images/og-image.jpg`,
+        url: `${siteUrl}/images/gentshood-og.jpg`,
         width: 1200,
         height: 630,
         alt: 'Gents Hood | Premium Menswear & Editorial Streetwear',
@@ -103,7 +103,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Gents Hood | Premium Menswear & Editorial Streetwear',
     description: 'Fashion that moves with you. Curated premium menswear and essentials.',
-    images: [`${siteUrl}/images/og-image.jpg`],
+    images: [`${siteUrl}/images/gentshood-og.jpg`],
   },
   verification: {
     google:
