@@ -739,7 +739,7 @@ export function CheckoutForm() {
             </div>
 
             {/* 
-              TASK 2: ATELIER TRUST BAR SITUATED AT THE VERY BOTTOM ("ekdom nice thakbe")
+              TASK 2: ATELIER TRUST BAR SITUATED AT THE VERY BOTTOM
             */}
             <div className="border-line/80 border-t pt-6">
               <div className="mb-3.5 flex items-center justify-between">

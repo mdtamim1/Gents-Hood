@@ -344,8 +344,8 @@ export function QueriesClient({
               7-Day Smart Memory Protection (Auto-Purge Policy)
             </p>
             <p className="text-[11px] text-white/45">
-              To keep hosting storage lightweight and superfast, all customer queries are
-              automatically and permanently deleted 7 days after arrival.
+              To keep hosting storage lightweight and fast, all customer queries are automatically
+              and permanently deleted 7 days after arrival.
             </p>
           </div>
         </div>
