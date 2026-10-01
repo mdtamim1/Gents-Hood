@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.service';
 import { verifyAdminAccess } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/services/audit.service';
-import { invalidateCacheKey } from '@/lib/cache';
+import { invalidateAllProductCaches, revalidateStorefront } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +19,13 @@ export async function GET() {
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -45,7 +50,10 @@ export async function GET() {
     });
   } catch (error: unknown) {
     console.error('Failed to get featured product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to retrieve signature product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to retrieve signature product' },
+      { status: 500 }
+    );
   }
 }
 
@@ -55,7 +63,13 @@ export async function POST(request: NextRequest) {
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -105,8 +119,8 @@ export async function POST(request: NextRequest) {
     // Update site setting
     await updateSiteSettings({ featuredProductId: productId });
 
-    invalidateCacheKey('featured_product');
-    revalidatePath('/');
+    await invalidateAllProductCaches();
+    revalidateStorefront();
 
     await createAuditLog({
       adminId: session.id,
@@ -136,7 +150,13 @@ export async function DELETE() {
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -147,8 +167,8 @@ export async function DELETE() {
 
     await updateSiteSettings({ featuredProductId: null });
 
-    invalidateCacheKey('featured_product');
-    revalidatePath('/');
+    await invalidateAllProductCaches();
+    revalidateStorefront();
 
     await createAuditLog({
       adminId: session.id,
@@ -159,7 +179,8 @@ export async function DELETE() {
 
     return NextResponse.json({
       success: true,
-      message: 'Signature Product removed from Homepage. You can now add or upload a new Signature Product.',
+      message:
+        'Signature Product removed from Homepage. You can now add or upload a new Signature Product.',
     });
   } catch (error: unknown) {
     console.error('Failed to remove featured product:', error);

@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { verifyAdminAccess } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/services/audit.service';
-import { invalidateCacheKey } from '@/lib/cache';
+import { invalidateCacheKey, invalidateAllProductCaches, revalidateStorefront } from '@/lib/cache';
 
 const updateProductSchema = z.object({
   name: z.string().min(2).optional(),
@@ -56,7 +55,13 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -88,7 +93,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -149,7 +160,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           color: v.color,
           colorHex: v.colorHex || '#171718',
           stock: v.stock,
-          sku: v.sku || `${existingProduct.slug}-${v.size}-${v.color}`.toUpperCase().replace(/\s+/g, '-'),
+          sku:
+            v.sku ||
+            `${existingProduct.slug}-${v.size}-${v.color}`.toUpperCase().replace(/\s+/g, '-'),
         })),
       });
     }
@@ -169,12 +182,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       });
     }
 
-    invalidateCacheKey('featured_product');
-    invalidateCacheKey('trending_products_8');
-    invalidateCacheKey('trending_catalog');
-    revalidatePath('/');
-    revalidatePath('/trending');
-    revalidatePath(`/product/${existingProduct.slug}`);
+    await invalidateAllProductCaches(existingProduct.slug);
+    if (updatedProduct.slug !== existingProduct.slug) {
+      await invalidateAllProductCaches(updatedProduct.slug);
+    }
+    revalidateStorefront(existingProduct.slug);
+    if (updatedProduct.slug !== existingProduct.slug) {
+      revalidateStorefront(updatedProduct.slug);
+    }
 
     await createAuditLog({
       adminId: session.id,
@@ -199,7 +214,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -224,14 +245,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
         where: { id: currentSettings.id },
         data: { featuredProductId: null },
       });
-      invalidateCacheKey('site_settings');
+      await invalidateCacheKey('site_settings');
     }
 
-    invalidateCacheKey('featured_product');
-    invalidateCacheKey('trending_products_8');
-    invalidateCacheKey('trending_catalog');
-    revalidatePath('/');
-    revalidatePath('/trending');
+    await invalidateAllProductCaches(product.slug);
+    revalidateStorefront(product.slug);
 
     await createAuditLog({
       adminId: session.id,

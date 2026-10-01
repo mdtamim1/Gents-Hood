@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { redis } from './redis';
 
 interface CacheEntry<T> {
@@ -76,22 +77,24 @@ export async function getOrSetCache<T>(
 /**
  * Invalidate a specific cache key across both L1 and L2
  */
-export function invalidateCacheKey(key: string): void {
+export async function invalidateCacheKey(key: string): Promise<void> {
   memoryStore.delete(key);
 
   if (redis) {
     const redisKey = `${KEY_PREFIX}${key}`;
-    redis.del(redisKey).catch((e) => {
+    try {
+      await redis.del(redisKey);
+    } catch (e) {
       console.warn(`[Redis Cache] Delete error for key "${redisKey}":`, e);
-    });
+    }
   }
 }
 
 /**
- * Invalidate all cache keys matching a prefix
+ * Invalidate all cache keys matching a prefix across both L1 and L2
  */
-export function invalidateCachePrefix(prefix: string): void {
-  for (const key of memoryStore.keys()) {
+export async function invalidateCachePrefix(prefix: string): Promise<void> {
+  for (const key of Array.from(memoryStore.keys())) {
     if (key.startsWith(prefix)) {
       memoryStore.delete(key);
     }
@@ -99,15 +102,42 @@ export function invalidateCachePrefix(prefix: string): void {
 
   if (redis) {
     const pattern = `${KEY_PREFIX}${prefix}*`;
-    redis
-      .keys(pattern)
-      .then((keys) => {
-        if (keys && keys.length > 0) {
-          redis?.del(...keys).catch((e) => {
-            console.warn(`[Redis Cache] Prefix delete error:`, e);
-          });
-        }
-      })
-      .catch(() => {});
+    try {
+      const keys = await redis.keys(pattern);
+      if (keys && keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } catch (e) {
+      console.warn(`[Redis Cache] Prefix delete error:`, e);
+    }
+  }
+}
+
+/**
+ * Invalidate all product caches (featured, trending limits, and slugs)
+ */
+export async function invalidateAllProductCaches(slug?: string): Promise<void> {
+  await Promise.all([
+    invalidateCachePrefix('trending_products_'),
+    invalidateCacheKey('featured_product'),
+    invalidateCacheKey('trending_catalog'),
+    slug ? invalidateCacheKey(`product_${slug}`) : invalidateCachePrefix('product_'),
+  ]);
+}
+
+/**
+ * Trigger Next.js On-Demand Revalidation for storefront routes
+ */
+export function revalidateStorefront(slug?: string): void {
+  try {
+    revalidatePath('/', 'page');
+    revalidatePath('/', 'layout');
+    revalidatePath('/trending', 'page');
+    revalidatePath('/contact', 'page');
+    if (slug) {
+      revalidatePath(`/product/${slug}`, 'page');
+    }
+  } catch (err) {
+    console.warn('[Cache] revalidatePath error:', err);
   }
 }

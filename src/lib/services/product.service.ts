@@ -6,7 +6,7 @@ import { ProductWithRelations } from '@/types';
  * Fetch the current Featured / Main product configured in SiteSettings
  */
 export async function getFeaturedProduct(): Promise<ProductWithRelations | null> {
-  return getOrSetCache('featured_product', 120, async () => {
+  return getOrSetCache('featured_product', 60, async () => {
     // 1. Look up featuredProductId from SiteSetting
     const setting = await db.siteSetting.findFirst();
 
@@ -40,7 +40,7 @@ export async function getFeaturedProduct(): Promise<ProductWithRelations | null>
  * Fetch trending products for landing section or trending catalog
  */
 export async function getTrendingProducts(limit = 8): Promise<ProductWithRelations[]> {
-  return getOrSetCache(`trending_products_${limit}`, 120, async () => {
+  return getOrSetCache(`trending_products_${limit}`, 60, async () => {
     const products = await db.product.findMany({
       where: {
         status: 'ACTIVE',
@@ -64,7 +64,7 @@ export async function getTrendingProducts(limit = 8): Promise<ProductWithRelatio
  * Fetch a single product by unique slug
  */
 export async function getProductBySlug(slug: string): Promise<ProductWithRelations | null> {
-  return getOrSetCache(`product_${slug}`, 120, async () => {
+  return getOrSetCache(`product_${slug}`, 60, async () => {
     const product = await db.product.findUnique({
       where: { slug, status: 'ACTIVE' },
       include: {

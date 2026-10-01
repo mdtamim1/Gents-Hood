@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { getTrendingProducts } from '@/lib/services/product.service';
 import { TrendingCatalog } from '@/components/product/TrendingCatalog';
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 export const metadata: Metadata = {
   title: 'Trending Pieces & Best of Gents Hood | Luxury Streetwear',

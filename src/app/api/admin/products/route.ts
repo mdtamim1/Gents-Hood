@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyAdminAccess } from '@/lib/permissions';
-import { revalidatePath } from 'next/cache';
 import { createAuditLog } from '@/lib/services/audit.service';
-import { invalidateCacheKey } from '@/lib/cache';
+import { invalidateAllProductCaches, revalidateStorefront } from '@/lib/cache';
 import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.service';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +32,13 @@ export async function GET(request: NextRequest) {
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -61,7 +66,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, products });
   } catch (error) {
     console.error('Products list error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch products' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch products' },
+      { status: 500 }
+    );
   }
 }
 
@@ -70,7 +78,13 @@ export async function POST(request: NextRequest) {
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -93,12 +107,15 @@ export async function POST(request: NextRequest) {
       status = 'ACTIVE',
       isTrending = false,
       isSignature = false,
-      images = [],   // array of { url, alt, colorHex, isPrimary }
+      images = [], // array of { url, alt, colorHex, isPrimary }
       variants = [],
     } = body;
 
     if (!name || !price) {
-      return NextResponse.json({ success: false, error: 'Name and price are required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Name and price are required' },
+        { status: 400 }
+      );
     }
 
     // If uploading as Signature Product, enforce the strict "1 product only" rule
@@ -150,19 +167,30 @@ export async function POST(request: NextRequest) {
         status,
         isTrending: Boolean(isTrending),
         images: {
-          create: images.slice(0, 15).map(
-            (img: { url: string; alt?: string; colorHex?: string; isPrimary?: boolean }, idx: number) => ({
-              url: img.url,
-              alt: img.alt || name,
-              position: idx,
-              isPrimary: idx === 0,
-              colorHex: img.colorHex || null,
-            })
-          ),
+          create: images
+            .slice(0, 15)
+            .map(
+              (
+                img: { url: string; alt?: string; colorHex?: string; isPrimary?: boolean },
+                idx: number
+              ) => ({
+                url: img.url,
+                alt: img.alt || name,
+                position: idx,
+                isPrimary: idx === 0,
+                colorHex: img.colorHex || null,
+              })
+            ),
         },
         variants: {
           create: variants.map(
-            (v: { size: string; color: string; colorHex?: string; stock: number; sku?: string }) => ({
+            (v: {
+              size: string;
+              color: string;
+              colorHex?: string;
+              stock: number;
+              sku?: string;
+            }) => ({
               size: v.size,
               color: v.color,
               colorHex: v.colorHex || '#171718',
@@ -180,14 +208,10 @@ export async function POST(request: NextRequest) {
 
     if (isSignature) {
       await updateSiteSettings({ featuredProductId: product.id });
-      invalidateCacheKey('featured_product');
     }
 
-    invalidateCacheKey('trending_products_8');
-    invalidateCacheKey('trending_catalog');
-    revalidatePath('/');
-    revalidatePath('/trending');
-    revalidatePath(`/product/${slug}`);
+    await invalidateAllProductCaches(slug);
+    revalidateStorefront(slug);
 
     await createAuditLog({
       adminId: session.id,
@@ -200,6 +224,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, product }, { status: 201 });
   } catch (error: unknown) {
     console.error('Failed to create product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to create product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to create product' },
+      { status: 500 }
+    );
   }
 }

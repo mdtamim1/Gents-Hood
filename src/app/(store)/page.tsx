@@ -8,8 +8,8 @@ import { TrendingGrid } from '@/components/landing/TrendingGrid';
 import { getFeaturedProduct, getTrendingProducts } from '@/lib/services/product.service';
 import { getSiteSettings } from '@/lib/services/settings.service';
 
-// Incremental Static Regeneration (ISR) every 60 seconds
-export const revalidate = 60;
+// Incremental Static Regeneration (ISR) every 30 seconds
+export const revalidate = 30;
 
 export default async function HomePage() {
   // Fetch real database records in parallel via cached backend services

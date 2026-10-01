@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.service';
 import { verifyAdminAccess } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/services/audit.service';
+import { revalidateStorefront } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,9 +134,7 @@ export async function PUT(request: NextRequest) {
       announcementsJson: data.announcementsJson,
     });
 
-    revalidatePath('/', 'layout');
-    revalidatePath('/');
-    revalidatePath('/contact');
+    revalidateStorefront();
 
     await createAuditLog({
       adminId: session.id,

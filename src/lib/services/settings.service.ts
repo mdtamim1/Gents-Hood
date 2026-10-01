@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import { getOrSetCache, invalidateCacheKey } from '@/lib/cache';
 
 export async function getSiteSettings() {
-  return getOrSetCache('site_settings', 120, async () => {
+  return getOrSetCache('site_settings', 60, async () => {
     let settings = await db.siteSetting.findFirst();
 
     if (!settings) {
@@ -55,8 +55,7 @@ export async function updateSiteSettings(data: {
     data,
   });
 
-  invalidateCacheKey('site_settings');
-  invalidateCacheKey('featured_product');
+  await Promise.all([invalidateCacheKey('site_settings'), invalidateCacheKey('featured_product')]);
 
   return updated;
 }

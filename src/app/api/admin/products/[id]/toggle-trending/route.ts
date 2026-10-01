@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { verifyAdminAccess } from '@/lib/permissions';
-import { invalidateCacheKey } from '@/lib/cache';
+import { invalidateAllProductCaches, revalidateStorefront } from '@/lib/cache';
 import { createAuditLog } from '@/lib/services/audit.service';
 
 export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
@@ -11,7 +10,13 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     const auth = await verifyAdminAccess('products');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Products permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden'
+              ? 'Forbidden: Products permission required'
+              : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -32,10 +37,8 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
       data: { isTrending: newTrending },
     });
 
-    invalidateCacheKey('trending_products_8');
-    invalidateCacheKey('trending_catalog');
-    revalidatePath('/');
-    revalidatePath('/trending');
+    await invalidateAllProductCaches(product.slug);
+    revalidateStorefront(product.slug);
 
     await createAuditLog({
       adminId: session.id,

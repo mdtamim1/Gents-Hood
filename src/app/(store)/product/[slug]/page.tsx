@@ -6,7 +6,7 @@ import { getProductBySlug, getTrendingProducts } from '@/lib/services/product.se
 import { ProductDetails } from '@/components/product/ProductDetails';
 import { ProductCard } from '@/components/product/ProductCard';
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 interface ProductPageProps {
   params: {
