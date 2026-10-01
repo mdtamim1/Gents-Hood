@@ -99,7 +99,9 @@ export const metadata: Metadata = {
     images: [`${siteUrl}/images/logo.png`],
   },
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+    google:
+      process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+      'CxAIpOKbg94fbzQWU8nKN24wje7l59i3wvh1IG58_40',
   },
   robots: {
     index: true,
