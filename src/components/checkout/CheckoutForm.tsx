@@ -667,7 +667,7 @@ export function CheckoutForm() {
                         />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold uppercase tracking-wider text-ink">
+                        <p className="truncate text-xs font-semibold tracking-wider text-ink">
                           {item.name}
                         </p>
                         <p className="text-[10px] uppercase text-muted">

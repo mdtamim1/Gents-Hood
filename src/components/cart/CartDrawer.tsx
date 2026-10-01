@@ -140,7 +140,7 @@ export function CartDrawer() {
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <div className="flex justify-between text-xs font-semibold text-ink">
-                        <h3 className="line-clamp-1 uppercase tracking-wide">{item.name}</h3>
+                        <h3 className="line-clamp-1 tracking-wide">{item.name}</h3>
                         <p className="ml-4 font-mono font-bold">
                           {formatPrice(item.price * item.quantity)}
                         </p>

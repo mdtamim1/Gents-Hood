@@ -300,7 +300,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         <div className="flex flex-col gap-0 lg:col-span-6">
           {/* ═══ HERO TITLE & PRICE BLOCK ═══ */}
           <div className="border-ink/10 border-b-2 pb-5 sm:pb-6">
-            <h1 className="font-cinzel text-xl font-bold uppercase leading-snug tracking-[0.04em] text-ink sm:text-2xl lg:text-3xl">
+            <h1 className="font-cinzel text-xl font-bold leading-snug tracking-[0.04em] text-ink sm:text-2xl lg:text-3xl">
               {product.name}
             </h1>
 

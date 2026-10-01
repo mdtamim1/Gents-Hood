@@ -231,7 +231,7 @@ export function FeaturedProduct({ initialProduct }: FeaturedProductProps) {
           <div className="flex flex-col gap-0 lg:col-span-6">
             {/* ═══ HERO TEXT BLOCK ═══ */}
             <div className="border-ink/10 border-b-2 pb-5 sm:pb-6">
-              <h2 className="font-cinzel text-xl font-bold uppercase leading-snug tracking-[0.04em] text-ink sm:text-2xl lg:text-3xl">
+              <h2 className="font-cinzel text-xl font-bold leading-snug tracking-[0.04em] text-ink sm:text-2xl lg:text-3xl">
                 {productName}
               </h2>
 

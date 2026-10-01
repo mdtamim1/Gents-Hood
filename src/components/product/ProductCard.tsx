@@ -98,7 +98,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Product Information (Center Aligned) */}
       <div className="mt-3 flex flex-col items-center space-y-1 text-center">
         <Link href={`/product/${product.slug}`} className="w-full focus-visible:outline-none">
-          <h4 className="line-clamp-1 text-center text-xs font-semibold uppercase tracking-wider text-ink transition-colors hover:text-[#4A0E17] sm:text-sm">
+          <h4 className="line-clamp-1 text-center text-xs font-semibold tracking-wider text-ink transition-colors hover:text-[#4A0E17] sm:text-sm">
             {product.name}
           </h4>
         </Link>

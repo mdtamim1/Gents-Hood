@@ -227,7 +227,7 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
             </div>
 
             <div className="min-w-0 flex-1">
-              <h4 className="line-clamp-1 text-xs font-bold uppercase tracking-wider text-ink sm:text-sm">
+              <h4 className="line-clamp-1 text-xs font-bold tracking-wider text-ink sm:text-sm">
                 {product.name}
               </h4>
 
