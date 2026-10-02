@@ -117,6 +117,9 @@ export const metadata: Metadata = {
     google:
       process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
       'CxAIpOKbg94fbzQWU8nKN24wje7l59i3wvh1IG58_40',
+    other: {
+      'facebook-domain-verification': '0vbm0cg0qqo0vj2qzy47ow729kg81x',
+    },
   },
   robots: {
     index: true,
