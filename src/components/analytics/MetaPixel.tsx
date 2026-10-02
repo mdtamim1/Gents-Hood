@@ -9,7 +9,7 @@ export function MetaPixel() {
   const pathname = usePathname();
   const isFirstRender = useRef(true);
   const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1920506915991873';
-  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+  const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-DHTYRBDEEH';
 
   // Track PageView on SPA client route changes (after initial page load)
   useEffect(() => {
