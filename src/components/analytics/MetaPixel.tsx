@@ -4,7 +4,7 @@ import React from 'react';
 import Script from 'next/script';
 
 export function MetaPixel() {
-  const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1920506915991873';
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
   return (
