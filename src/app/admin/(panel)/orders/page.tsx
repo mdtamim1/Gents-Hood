@@ -15,11 +15,12 @@ export default async function AdminOrdersPage() {
     redirect(`/admin/login?reason=${auth.reason}`);
   }
   const session = auth.session;
+  const currentRole = (auth.user?.role || session.role) as 'OWNER' | 'STAFF';
 
   // By default, staff sees only their assigned orders.
   // When staff searches (via API), they can search all orders across the store.
   // Admin sees all orders.
-  const whereClause = session.role !== 'OWNER' ? { assignedToId: session.id } : {};
+  const whereClause = currentRole !== 'OWNER' ? { assignedToId: session.id } : {};
 
   const [orders, counts, staffList, user] = await Promise.all([
     db.order.findMany({
@@ -58,7 +59,7 @@ export default async function AdminOrdersPage() {
       };
     })(),
     // Staff list with live online status (owners only, for assignment & filtering)
-    session.role === 'OWNER'
+    currentRole === 'OWNER'
       ? (async () => {
           const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
           const [allStaff, activeSessions] = await Promise.all([
@@ -94,7 +95,7 @@ export default async function AdminOrdersPage() {
   const sessionData = {
     id: session.id,
     name: user?.name || session.name,
-    role: session.role,
+    role: currentRole,
   };
 
   return (

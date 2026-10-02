@@ -168,6 +168,8 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
 
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [initialProducts, setInitialProducts] = useState<Product[]>([]);
+  const [loadingInitial, setLoadingInitial] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -209,21 +211,42 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     return form.shippingDistrict ? getUpazilas(form.shippingDistrict) : [];
   }, [form.shippingDistrict]);
 
+  // Fetch initial active products so staff can see and select products immediately
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingInitial(true);
+    fetch('/api/admin/products?status=ACTIVE')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.success && Array.isArray(data.products)) {
+          setInitialProducts(data.products);
+          setSearchResults(data.products.slice(0, 8));
+        }
+      })
+      .catch((err) => console.error('Failed to load initial products:', err))
+      .finally(() => {
+        if (isMounted) setLoadingInitial(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Search products debounced
   useEffect(() => {
     if (!productSearch.trim()) {
-      setSearchResults([]);
+      setSearchResults(initialProducts.slice(0, 8));
       return;
     }
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
         const res = await fetch(
-          `/api/admin/products?search=${encodeURIComponent(productSearch)}&status=ACTIVE`
+          `/api/admin/products?search=${encodeURIComponent(productSearch.trim())}&status=ACTIVE`
         );
         const data = await res.json();
-        if (data.success) {
-          setSearchResults(data.products?.slice(0, 8) || []);
+        if (data.success && Array.isArray(data.products)) {
+          setSearchResults(data.products.slice(0, 8));
         }
       } catch {
         // ignore
@@ -232,7 +255,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [productSearch]);
+  }, [productSearch, initialProducts]);
 
   // Handle selecting a product from search -> automate color and size selection
   const handleSelectProduct = (product: Product) => {
@@ -339,7 +362,7 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     // Reset configurator and search
     setSelectedProduct(null);
     setProductSearch('');
-    setSearchResults([]);
+    setSearchResults(initialProducts.slice(0, 8));
   };
 
   const removeItem = (idx: number) => {
@@ -755,10 +778,10 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                         setProductSearch(e.target.value);
                         if (selectedProduct) setSelectedProduct(null);
                       }}
-                      placeholder="Search product name..."
+                      placeholder="Search product name or SKU..."
                       className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-8 text-xs text-white placeholder-zinc-500 outline-none focus:border-zinc-500"
                     />
-                    {isSearching && (
+                    {(isSearching || loadingInitial) && (
                       <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-zinc-400" />
                     )}
                   </div>
@@ -828,6 +851,17 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                       })}
                     </div>
                   )}
+
+                  {/* Empty state when search yields no products */}
+                  {!isSearching &&
+                    !loadingInitial &&
+                    searchResults.length === 0 &&
+                    productSearch.trim() &&
+                    !selectedProduct && (
+                      <div className="mt-2 rounded-lg border border-white/[0.08] bg-[#131315] p-3 text-center text-xs text-zinc-400">
+                        No products found matching &ldquo;{productSearch}&rdquo;
+                      </div>
+                    )}
 
                   {/* AUTOMATED PRODUCT CONFIGURATOR PANEL */}
                   {selectedProduct && (

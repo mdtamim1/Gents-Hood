@@ -1193,8 +1193,8 @@ export default function OrdersPageClient({
                           </span>
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Courier Entry Button — only for SHIPPED orders */}
-                            {order.status === 'SHIPPED' && (
+                            {/* Courier Entry Button — only for SHIPPED orders (Owner only, hidden in staff panel) */}
+                            {isOwner && order.status === 'SHIPPED' && (
                               <button
                                 type="button"
                                 onClick={() => handleOneClickSteadfast(order)}

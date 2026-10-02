@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { verifyAdminAccess } from '@/lib/permissions';
+import { verifyAdminAccess, hasPermission } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/services/audit.service';
 import { invalidateAllProductCaches, revalidateStorefront } from '@/lib/cache';
 import { getSiteSettings, updateSiteSettings } from '@/lib/services/settings.service';
@@ -29,28 +29,36 @@ function generateSku(name: string): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAccess('products');
+    const auth = await verifyAdminAccess();
     if (!auth.authorized) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            auth.reason === 'forbidden'
-              ? 'Forbidden: Products permission required'
-              : 'Unauthorized',
+          error: auth.reason === 'forbidden' ? 'Forbidden' : 'Unauthorized',
         },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
 
+    // Allow if user has either products or orders permission
+    if (auth.user && !hasPermission(auth.user, 'products') && !hasPermission(auth.user, 'orders')) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Products or Orders permission required' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search')?.toLowerCase() || '';
+    const search = searchParams.get('search')?.trim() || '';
     const status = searchParams.get('status') || 'ACTIVE';
 
     const whereClause: Record<string, unknown> = {};
     if (status !== 'ALL') whereClause.status = status;
     if (search) {
-      whereClause.OR = [{ name: { contains: search } }, { sku: { contains: search } }];
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     const products = await db.product.findMany({

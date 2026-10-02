@@ -288,7 +288,7 @@ export function OrderDetailClient({ initialOrder }: { initialOrder: OrderDetail 
                 rows={2}
                 value={statusNote}
                 onChange={(e) => setStatusNote(e.target.value)}
-                placeholder="e.g. Called customer, confirmed Steedfast courier tracking #..."
+                placeholder="e.g. Called customer, confirmed Steadfast courier tracking #..."
                 className="border-muted/30 w-full rounded-[1px] border bg-ink px-3 py-2 text-xs text-cream focus:border-cream focus:outline-none"
               />
             </div>
