@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import { redis } from './redis';
+import { autoNotifySearchEngines } from '@/lib/services/indexing.service';
 
 interface CacheEntry<T> {
   value: T;
@@ -137,6 +138,13 @@ export function revalidateStorefront(slug?: string): void {
     if (slug) {
       revalidatePath(`/product/${slug}`, 'page');
     }
+
+    // Automatically broadcast updated pages to Google & IndexNow search engines
+    const pathsToNotify = ['/', '/trending', '/sitemap.xml'];
+    if (slug) {
+      pathsToNotify.unshift(`/product/${slug}`);
+    }
+    autoNotifySearchEngines(pathsToNotify);
   } catch (err) {
     console.warn('[Cache] revalidatePath error:', err);
   }

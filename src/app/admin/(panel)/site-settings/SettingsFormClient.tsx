@@ -17,6 +17,7 @@ import {
   ArrowDown,
   ExternalLink,
   Flame,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
@@ -233,7 +234,10 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
       // ignore
     }
   } else if (initialSettings.announcementText) {
-    const parts = initialSettings.announcementText.split('|').map((s) => s.trim()).filter(Boolean);
+    const parts = initialSettings.announcementText
+      .split('|')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (parts.length > 0) {
       parsedAnnouncements = parts.map((t, i) => ({
         id: String(i + 1),
@@ -266,7 +270,8 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
 
     // Task 4: Announcement Bar
     announcements: parsedAnnouncements,
-    announcementText: initialSettings.announcementText || parsedAnnouncements.map((a) => a.text).join(' | '),
+    announcementText:
+      initialSettings.announcementText || parsedAnnouncements.map((a) => a.text).join(' | '),
 
     // Task 1: Trending Marquee Ticker
     trendingMarqueeText:
@@ -292,6 +297,27 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
   // Track upload states
   const [uploadingGalleryIdx, setUploadingGalleryIdx] = useState<number | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [isPinging, setIsPinging] = useState(false);
+
+  const handlePingSearchEngines = async () => {
+    setIsPinging(true);
+    try {
+      const res = await fetch('/api/admin/indexing/ping', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to ping search engines');
+      }
+      showToast(
+        `⚡ Instant indexing signal sent to search engines for ${data.urls?.length || 0} pages!`,
+        'success'
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to ping search engines';
+      showToast(msg, 'danger');
+    } finally {
+      setIsPinging(false);
+    }
+  };
 
   // File upload handler for Sharp WebP compression
   const uploadImageFile = async (file: File): Promise<string> => {
@@ -399,7 +425,10 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
         throw new Error(data.error || 'Failed to update settings');
       }
 
-      showToast('All site & storefront settings saved successfully! Live storefront caches refreshed.', 'success');
+      showToast(
+        'All site & storefront settings saved successfully! Live storefront caches refreshed.',
+        'success'
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error saving settings';
       showToast(msg, 'danger');
@@ -427,11 +456,23 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
               Site & Storefront Settings
             </h1>
             <p className="mt-0.5 text-xs text-white/50">
-              Customize marquees, announcement headlines, FAQ cards, gallery media, and shipping thresholds.
+              Customize marquees, announcement headlines, FAQ cards, gallery media, and shipping
+              thresholds.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={isPinging}
+              onClick={handlePingSearchEngines}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50"
+              title="Ping Google & IndexNow search engines for all active site URLs"
+            >
+              <Zap className={`h-3.5 w-3.5 text-emerald-400 ${isPinging ? 'animate-spin' : ''}`} />
+              <span>{isPinging ? 'Pinging Search Engines...' : '⚡ Ping Search Engines'}</span>
+            </button>
+
             <Link
               href="/"
               target="_blank"
@@ -467,7 +508,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
           >
             <Flame className="h-3.5 w-3.5 text-[#e50914]" />
             <span>1. Marquees & Announcements</span>
-            <span className="rounded-full bg-[#e50914]/20 px-1.5 py-0.2 font-mono text-[9px] text-[#ff7070]">
+            <span className="py-0.2 rounded-full bg-[#e50914]/20 px-1.5 font-mono text-[9px] text-[#ff7070]">
               Tasks 1, 2, 4
             </span>
           </button>
@@ -483,7 +524,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
           >
             <Images className="h-3.5 w-3.5 text-[#D4AF37]" />
             <span>2. Banners & Gallery Media</span>
-            <span className="rounded-full bg-[#D4AF37]/20 px-1.5 py-0.2 font-mono text-[9px] text-[#f7e089]">
+            <span className="py-0.2 rounded-full bg-[#D4AF37]/20 px-1.5 font-mono text-[9px] text-[#f7e089]">
               Task 5
             </span>
           </button>
@@ -499,7 +540,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
           >
             <HelpCircle className="h-3.5 w-3.5 text-emerald-400" />
             <span>3. Frequently Asked Questions</span>
-            <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.2 font-mono text-[9px] text-emerald-300">
+            <span className="py-0.2 rounded-full bg-emerald-500/20 px-1.5 font-mono text-[9px] text-emerald-300">
               Task 3
             </span>
           </button>
@@ -526,16 +567,19 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
         <div className="space-y-6">
           {/* ── Task 4 (Image 4): Announcement Bar Manager ── */}
           <div className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded bg-[#4A0E17] px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[#ff99a8]">
                     Image 4 • Task 4
                   </span>
-                  <h2 className="text-base font-bold text-white">Top Announcement Bar (হেডার অ্যানাউন্সমেন্ট)</h2>
+                  <h2 className="text-base font-bold text-white">
+                    Top Announcement Bar (হেডার অ্যানাউন্সমেন্ট)
+                  </h2>
                 </div>
                 <p className="mt-1 text-xs text-white/50">
-                  ওয়েবসাইটের একদম উপরে যে লাল স্ট্রিপে স্লাইড হতে থাকে, সেই টেক্সটগুলো এখান থেকে পরিবর্তন ও যোগ করুন।
+                  ওয়েবসাইটের একদম উপরে যে লাল স্ট্রিপে স্লাইড হতে থাকে, সেই টেক্সটগুলো এখান থেকে
+                  পরিবর্তন ও যোগ করুন।
                 </p>
               </div>
 
@@ -602,7 +646,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                         setForm({ ...form, announcements: updated });
                       }}
                       placeholder="e.g. FREE EXPRESS SHIPPING ACROSS BANGLADESH ON ORDERS OVER ৳3,000"
-                      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium uppercase tracking-wide text-white placeholder:text-white/20 focus:border-[#800020] focus:ring-1 focus:ring-[#800020] focus:outline-none"
+                      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium uppercase tracking-wide text-white placeholder:text-white/20 focus:border-[#800020] focus:outline-none focus:ring-1 focus:ring-[#800020]"
                     />
                   </div>
 
@@ -682,23 +726,30 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   Live Marquee Preview (লাইভ প্রিভিউ)
                 </span>
                 <span className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400" />
                   Infinite Ticker Active
                 </span>
               </div>
               <div className="relative overflow-hidden rounded bg-[#1c0509] py-2 text-white">
-                <div className="flex animate-marquee-ticker whitespace-nowrap" style={{ animationDuration: '20s' }}>
+                <div
+                  className="animate-marquee-ticker flex whitespace-nowrap"
+                  style={{ animationDuration: '20s' }}
+                >
                   {form.announcements.map((a, i) => (
                     <div key={i} className="flex items-center gap-3 px-6">
                       <span className="text-[#D4AF37]">{a.icon || '✦'}</span>
-                      <span className="font-mono text-[11px] font-bold tracking-wider">{a.text}</span>
+                      <span className="font-mono text-[11px] font-bold tracking-wider">
+                        {a.text}
+                      </span>
                     </div>
                   ))}
                   {/* duplicate for seamless loop */}
                   {form.announcements.map((a, i) => (
                     <div key={`d-${i}`} className="flex items-center gap-3 px-6">
                       <span className="text-[#D4AF37]">{a.icon || '✦'}</span>
-                      <span className="font-mono text-[11px] font-bold tracking-wider">{a.text}</span>
+                      <span className="font-mono text-[11px] font-bold tracking-wider">
+                        {a.text}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -718,7 +769,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                 </h2>
               </div>
               <p className="mt-1 text-xs text-white/50">
-                হোমপেইজের Trending Collection ব্যানারের নিচে লাল ডট সহ যে রানিং স্ক্রল টেক্সটটি চলে, সেটি নিজের ইচ্ছামতো পরিবর্তন করুন। শব্দগুলো &quot;•&quot; বা &quot;|&quot; দিয়ে আলাদা করুন।
+                হোমপেইজের Trending Collection ব্যানারের নিচে লাল ডট সহ যে রানিং স্ক্রল টেক্সটটি চলে,
+                সেটি নিজের ইচ্ছামতো পরিবর্তন করুন। শব্দগুলো &quot;•&quot; বা &quot;|&quot; দিয়ে
+                আলাদা করুন।
               </p>
             </div>
 
@@ -733,11 +786,12 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   value={form.trendingMarqueeText}
                   onChange={(e) => setForm({ ...form, trendingMarqueeText: e.target.value })}
                   placeholder="BEST OF GENTS HOOD • PREMIUM COLLECTIONS • 100% COMBED COTTON"
-                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 font-mono text-xs uppercase tracking-wider text-white placeholder:text-white/20 focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] focus:outline-none"
+                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 font-mono text-xs uppercase tracking-wider text-white placeholder:text-white/20 focus:border-[#e50914] focus:outline-none focus:ring-1 focus:ring-[#e50914]"
                 />
                 <p className="mt-1.5 text-[11px] text-white/40">
                   টিপ: প্রতিটি আইটেমের মাঝে <code className="text-[#D4AF37]">•</code> অথবা{' '}
-                  <code className="text-[#D4AF37]">|</code> চিহ্ন দিন। প্রতিটি আইটেমের আগে স্বয়ংক্রিয়ভাবে লাল ডট ও শেষে স্ল্যাশ প্রদর্শিত হবে।
+                  <code className="text-[#D4AF37]">|</code> চিহ্ন দিন। প্রতিটি আইটেমের আগে
+                  স্বয়ংক্রিয়ভাবে লাল ডট ও শেষে স্ল্যাশ প্রদর্শিত হবে।
                 </p>
               </div>
 
@@ -788,7 +842,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-white/90">
                             {text}
                           </span>
-                          <span className="ml-5 select-none font-mono text-[10px] text-white/20">/</span>
+                          <span className="ml-5 select-none font-mono text-[10px] text-white/20">
+                            /
+                          </span>
                         </div>
                       ))}
                     {form.trendingMarqueeText
@@ -801,7 +857,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-white/90">
                             {text}
                           </span>
-                          <span className="ml-5 select-none font-mono text-[10px] text-white/20">/</span>
+                          <span className="ml-5 select-none font-mono text-[10px] text-white/20">
+                            /
+                          </span>
                         </div>
                       ))}
                   </div>
@@ -822,7 +880,8 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                 </h2>
               </div>
               <p className="mt-1 text-xs text-white/50">
-                FAQ সেকশনের ঠিক নিচে ও ফুটারে চলমান ২ লাইনের বিশাল স্টাইল ম্যানিফেস্টো টেক্সট কাস্টমাইজ করুন।
+                FAQ সেকশনের ঠিক নিচে ও ফুটারে চলমান ২ লাইনের বিশাল স্টাইল ম্যানিফেস্টো টেক্সট
+                কাস্টমাইজ করুন।
               </p>
             </div>
 
@@ -837,7 +896,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   value={form.manifestoLine1}
                   onChange={(e) => setForm({ ...form, manifestoLine1: e.target.value })}
                   placeholder="Signature Style for Modern Men."
-                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 text-xs font-serif tracking-wider text-white placeholder:text-white/20 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none"
+                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 font-serif text-xs tracking-wider text-white placeholder:text-white/20 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                 />
                 <p className="mt-1 text-[11px] text-white/40">
                   ডিফল্ট: &quot;Signature Style for Modern Men.&quot;
@@ -854,7 +913,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   value={form.manifestoLine2}
                   onChange={(e) => setForm({ ...form, manifestoLine2: e.target.value })}
                   placeholder="Everyday Style, Made Exceptional."
-                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 text-xs font-serif tracking-wider text-white placeholder:text-white/20 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none"
+                  className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-4 py-2.5 font-serif text-xs tracking-wider text-white placeholder:text-white/20 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
                 />
                 <p className="mt-1 text-[11px] text-white/40">
                   ডিফল্ট: &quot;Everyday Style, Made Exceptional.&quot;
@@ -889,7 +948,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                 Live Editorial Preview
               </span>
               <div className="space-y-2 overflow-hidden py-3 font-serif">
-                <div className="flex animate-marquee-ticker whitespace-nowrap text-lg sm:text-2xl font-normal uppercase tracking-[0.2em]">
+                <div className="animate-marquee-ticker flex whitespace-nowrap text-lg font-normal uppercase tracking-[0.2em] sm:text-2xl">
                   <span className="text-white/90">{form.manifestoLine1}</span>
                   <span className="mx-6 text-[#D4AF37]/50">✦</span>
                   <span className="text-white/90">{form.manifestoLine1}</span>
@@ -897,7 +956,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   <span className="text-white/90">{form.manifestoLine1}</span>
                 </div>
                 <div
-                  className="flex animate-marquee-ticker whitespace-nowrap text-lg sm:text-2xl font-normal uppercase tracking-[0.2em]"
+                  className="animate-marquee-ticker flex whitespace-nowrap text-lg font-normal uppercase tracking-[0.2em] sm:text-2xl"
                   style={{ animationDirection: 'reverse' }}
                 >
                   <span className="text-[#c8a97e]">{form.manifestoLine2}</span>
@@ -919,7 +978,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
         <div className="space-y-6">
           {/* ── Task 5: Trending Collection Banner with Direct WebP Upload ── */}
           <div className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded bg-[#D4AF37]/20 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[#fce494]">
@@ -930,7 +989,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   </h2>
                 </div>
                 <p className="mt-1 text-xs text-white/50">
-                  হোমপেইজের &quot;BEST OF GENTS HOOD&quot; সেকশনের মূল ব্যানার। সরাসরি নিজের কম্পিউটার থেকে যেকোনো ছবি আপলোড করতে পারবেন — ছবি স্বয়ংক্রিয়ভাবে ক্রিস্টাল-ক্লিয়ার WebP ফরম্যাটে অপ্টিমাইজ হয়ে যাবে (কোনো ঘোলা হবে না)।
+                  হোমপেইজের &quot;BEST OF GENTS HOOD&quot; সেকশনের মূল ব্যানার। সরাসরি নিজের
+                  কম্পিউটার থেকে যেকোনো ছবি আপলোড করতে পারবেন — ছবি স্বয়ংক্রিয়ভাবে ক্রিস্টাল-ক্লিয়ার
+                  WebP ফরম্যাটে অপ্টিমাইজ হয়ে যাবে (কোনো ঘোলা হবে না)।
                 </p>
               </div>
               <span className="rounded-full bg-emerald-500/10 px-3 py-1 font-mono text-[10px] font-bold text-emerald-400 ring-1 ring-emerald-500/20">
@@ -942,7 +1003,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
               <div className="space-y-4">
                 {/* Media Type Selector */}
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-white/80">Media Type</label>
+                  <label className="mb-2 block text-xs font-semibold text-white/80">
+                    Media Type
+                  </label>
                   <div className="flex items-center gap-4">
                     <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10">
                       <input
@@ -980,7 +1043,11 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="relative inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-r from-[#800020] to-[#5C0612] px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:brightness-110 active:scale-95">
                         <Upload className="h-4 w-4" />
-                        <span>{uploadingBanner ? 'Optimizing & Uploading...' : 'Upload Image From Computer'}</span>
+                        <span>
+                          {uploadingBanner
+                            ? 'Optimizing & Uploading...'
+                            : 'Upload Image From Computer'}
+                        </span>
                         <input
                           type="file"
                           accept="image/*"
@@ -999,7 +1066,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                       <input
                         type="text"
                         value={form.trendingBannerImageUrl}
-                        onChange={(e) => setForm({ ...form, trendingBannerImageUrl: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, trendingBannerImageUrl: e.target.value })
+                        }
                         placeholder="/images/trending-banner.jpg or /uploads/..."
                         className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-3.5 py-2 font-mono text-xs text-white placeholder:text-white/20 focus:border-[#800020] focus:outline-none"
                       />
@@ -1042,7 +1111,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                     <input
                       type="text"
                       value={form.trendingBannerButtonText}
-                      onChange={(e) => setForm({ ...form, trendingBannerButtonText: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, trendingBannerButtonText: e.target.value })
+                      }
                       placeholder="Explore Collection"
                       className="w-full rounded-lg border border-white/10 bg-[#0E0E10] px-3.5 py-2 text-xs font-medium text-white placeholder:text-white/20 focus:border-[#800020] focus:outline-none"
                     />
@@ -1077,7 +1148,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                       <span className="font-mono text-[9px] uppercase tracking-widest text-[#D4AF37]">
                         ★ Curated Selection
                       </span>
-                      <h3 className="text-xl font-black uppercase tracking-tight text-white">GENTS HOOD</h3>
+                      <h3 className="text-xl font-black uppercase tracking-tight text-white">
+                        GENTS HOOD
+                      </h3>
                     </div>
                     <div className="rounded border border-[#e50914]/60 bg-[#e50914]/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-sm">
                       {form.trendingBannerButtonText || 'Explore Collection'} →
@@ -1090,7 +1163,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
 
           {/* ── Task 5: Homepage Product Preview Strip with Direct WebP Upload ── */}
           <div className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded bg-[#D4AF37]/20 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[#fce494]">
@@ -1101,7 +1174,8 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   </h2>
                 </div>
                 <p className="mt-1 text-xs text-white/50">
-                  হোমপেইজের ডার্ক স্ট্রিপ কার্ডগুলোর ছবি ও নাম পরিবর্তন করুন। প্রতিটি কার্ডে সরাসরি ইমেজ ফাইল আপলোড করা যায় যা স্বয়ংক্রিয়ভাবে হাই-কোয়ালিটি WebP তে রূপান্তর হয়।
+                  হোমপেইজের ডার্ক স্ট্রিপ কার্ডগুলোর ছবি ও নাম পরিবর্তন করুন। প্রতিটি কার্ডে সরাসরি
+                  ইমেজ ফাইল আপলোড করা যায় যা স্বয়ংক্রিয়ভাবে হাই-কোয়ালিটি WebP তে রূপান্তর হয়।
                 </p>
               </div>
 
@@ -1136,7 +1210,9 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   className="relative rounded-xl border border-white/[0.08] bg-[#0E0E10] p-4 shadow-md transition-all hover:border-white/20"
                 >
                   <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
-                    <span className="font-mono text-xs font-bold text-[#D4AF37]">Card #{idx + 1}</span>
+                    <span className="font-mono text-xs font-bold text-[#D4AF37]">
+                      Card #{idx + 1}
+                    </span>
                     {form.galleryStrip.length > 1 && (
                       <button
                         type="button"
@@ -1235,7 +1311,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
 
           {/* Hero Branding words */}
           <div className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
-            <h2 className="text-base font-bold text-white border-b border-white/[0.08] pb-3">
+            <h2 className="border-b border-white/[0.08] pb-3 text-base font-bold text-white">
               Hero Section Typography
             </h2>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1275,7 +1351,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
       {activeTab === 'faqs' && (
         <div className="space-y-6">
           <div className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-6 items-center rounded bg-emerald-500/20 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">
@@ -1286,7 +1362,8 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                   </h2>
                 </div>
                 <p className="mt-1 text-xs text-white/50">
-                  ওয়েবসাইটের হোমপেইজের FAQ সেকশনের সব প্রশ্ন ও উত্তর এখান থেকে সরাসরি এডিট, নতুন যোগ কিংবা ডিলিট করতে পারবেন।
+                  ওয়েবসাইটের হোমপেইজের FAQ সেকশনের সব প্রশ্ন ও উত্তর এখান থেকে সরাসরি এডিট, নতুন
+                  যোগ কিংবা ডিলিট করতে পারবেন।
                 </p>
               </div>
 
@@ -1310,7 +1387,8 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                       number: newNum,
                       badge: 'Customer Care',
                       question: 'New Question Title?',
-                      answer: 'Detailed and reassuring answer explaining policy, fabric, delivery or return details.',
+                      answer:
+                        'Detailed and reassuring answer explaining policy, fabric, delivery or return details.',
                       highlights: ['Feature 1', 'Feature 2'],
                     };
                     setForm({ ...form, faqs: [...form.faqs, newFaq] });
@@ -1503,7 +1581,10 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
 
               <div className="space-y-3">
                 {form.faqs.slice(0, 3).map((f, i) => (
-                  <div key={i} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                  <div
+                    key={i}
+                    className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+                  >
                     <div className="flex items-center gap-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded bg-[#4A0E17]/10 font-mono text-[10px] font-bold text-[#4A0E17]">
                         {f.number}
