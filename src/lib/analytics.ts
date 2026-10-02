@@ -38,6 +38,8 @@ export interface PurchaseParams {
   value: number;
   currency?: string;
   num_items: number;
+  content_ids?: string[];
+  contents?: Array<{ id: string; quantity: number; item_price?: number }>;
 }
 
 declare global {
@@ -45,7 +47,7 @@ declare global {
     fbq?: (
       action: 'track' | 'trackCustom' | 'init',
       eventName: string,
-      params?: Record<string, string | number | boolean | string[] | undefined>
+      params?: Record<string, unknown>
     ) => void;
     gtag?: (
       command: 'event' | 'config' | 'js',
@@ -57,12 +59,19 @@ declare global {
 }
 
 /**
+ * Dispatch an event to Google Tag Manager dataLayer safely
+ */
+export function pushDataLayer(data: Record<string, unknown>): void {
+  if (typeof window !== 'undefined') {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(data);
+  }
+}
+
+/**
  * Dispatch Meta Pixel track event safely
  */
-export function trackMetaEvent(
-  eventName: string,
-  params?: Record<string, string | number | boolean | string[] | undefined>
-): void {
+export function trackMetaEvent(eventName: string, params?: Record<string, unknown>): void {
   if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
     try {
       window.fbq('track', eventName, params);
@@ -110,6 +119,19 @@ export function trackViewContent(data: ViewContentParams): void {
       price: data.value,
     })),
   });
+
+  pushDataLayer({
+    event: 'view_item',
+    ecommerce: {
+      currency,
+      value: data.value,
+      items: data.content_ids.map((id) => ({
+        item_id: id,
+        item_name: data.content_name,
+        price: data.value,
+      })),
+    },
+  });
 }
 
 /**
@@ -134,6 +156,19 @@ export function trackAddToCart(data: AddToCartParams): void {
       price: data.value,
     })),
   });
+
+  pushDataLayer({
+    event: 'add_to_cart',
+    ecommerce: {
+      currency,
+      value: data.value,
+      items: data.content_ids.map((id) => ({
+        item_id: id,
+        item_name: data.content_name,
+        price: data.value,
+      })),
+    },
+  });
 }
 
 /**
@@ -151,6 +186,15 @@ export function trackInitiateCheckout(data: InitiateCheckoutParams): void {
     currency,
     value: data.value,
   });
+
+  pushDataLayer({
+    event: 'begin_checkout',
+    ecommerce: {
+      currency,
+      value: data.value,
+      num_items: data.num_items,
+    },
+  });
 }
 
 /**
@@ -163,12 +207,37 @@ export function trackPurchase(data: PurchaseParams): void {
     value: data.value,
     currency,
     num_items: data.num_items,
+    content_ids: data.content_ids,
+    contents: data.contents,
   });
 
   trackGaEvent('purchase', {
     transaction_id: data.order_id,
     value: data.value,
     currency,
+  });
+
+  pushDataLayer({
+    event: 'purchase',
+    ecommerce: {
+      transaction_id: data.order_id,
+      value: data.value,
+      currency,
+      num_items: data.num_items,
+      items: data.contents
+        ? data.contents.map((item) => ({
+            item_id: item.id,
+            price: item.item_price,
+            quantity: item.quantity,
+          }))
+        : [
+            {
+              item_id: data.order_id,
+              price: data.value,
+              quantity: data.num_items,
+            },
+          ],
+    },
   });
 }
 

@@ -1,11 +1,33 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Script from 'next/script';
+import { usePathname } from 'next/navigation';
+import { pushDataLayer } from '@/lib/analytics';
 
 export function MetaPixel() {
+  const pathname = usePathname();
+  const isFirstRender = useRef(true);
   const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1920506915991873';
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
+  // Track PageView on SPA client route changes (after initial page load)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+      window.fbq('track', 'PageView');
+    }
+
+    pushDataLayer({
+      event: 'page_view',
+      page_path: pathname,
+      page_url: typeof window !== 'undefined' ? window.location.href : '',
+    });
+  }, [pathname]);
 
   return (
     <>

@@ -34,11 +34,23 @@ export default async function OrderSuccessPage({ params }: OrderSuccessPageProps
   }
 
   const totalItemCount = order.items.reduce((sum, item) => sum + item.qty, 0);
+  const contentIds = order.items.map((item) => item.productId || item.id);
+  const contents = order.items.map((item) => ({
+    id: item.productId || item.id,
+    quantity: item.qty,
+    item_price: item.priceSnapshot,
+  }));
 
   return (
     <main className="min-h-screen">
       {/* Client Analytics Dispatch & Cart Cleanup */}
-      <OrderSuccessTracker orderNo={order.orderNo} total={order.total} itemCount={totalItemCount} />
+      <OrderSuccessTracker
+        orderNo={order.orderNo}
+        total={order.total}
+        itemCount={totalItemCount}
+        contentIds={contentIds}
+        contents={contents}
+      />
 
       {/* Ultra-Premium Interactive Animated Order Confirmation View */}
       <OrderSuccessClient order={order} siteSettings={settings} />
