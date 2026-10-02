@@ -242,6 +242,26 @@ export function trackPurchase(data: PurchaseParams): void {
 }
 
 /**
+ * Helper to SHA-256 hash customer data for Meta Conversions API
+ */
+async function hashCapiParam(value?: string, isPhone = false): Promise<string | undefined> {
+  if (!value) return undefined;
+  try {
+    let normalized = value.trim().toLowerCase();
+    if (isPhone) {
+      normalized = normalized.replace(/\D/g, '');
+      if (normalized.startsWith('01')) {
+        normalized = '88' + normalized;
+      }
+    }
+    const { createHash } = await import('crypto');
+    return createHash('sha256').update(normalized).digest('hex');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Server-side Conversions API (CAPI) helper.
  * Dispatches asynchronously to avoid blocking the HTTP response thread.
  */
@@ -257,27 +277,33 @@ export async function sendServerCapiEvent(
     userAgent?: string;
   }
 ): Promise<void> {
-  const pixelId = process.env.FB_PIXEL_ID || process.env.NEXT_PUBLIC_META_PIXEL_ID;
-  const accessToken = process.env.FB_ACCESS_TOKEN;
+  const pixelId =
+    process.env.FB_PIXEL_ID || process.env.NEXT_PUBLIC_META_PIXEL_ID || '1920506915991873';
+  const accessToken =
+    process.env.FB_ACCESS_TOKEN ||
+    'EAAWLx9PQxrwBSid7uatOlMlN3ooZA2wwMtqytBfrnGfhcwc3UtHpWPVnP8LZCEeQ88l4JtDm8q3f3ZCCS1IoGyv70ziUDClwypTrAsiY11CPSjyXl7d7ZCjRURxQnc6L4wOHzxAb5100eTkeXLgQvZCsuatpA6TbLvX808dX0UXadZC7SOMAbBiIPAb8whgQZDZD';
 
   if (!pixelId || !accessToken) {
-    // CAPI credentials not configured; skip silently
     return;
   }
 
   try {
-    const payload = {
+    const hashedPhone = await hashCapiParam(eventData.phone, true);
+    const hashedEmail = await hashCapiParam(eventData.email, false);
+
+    const userData: Record<string, unknown> = {};
+    if (eventData.clientIp) userData.client_ip_address = eventData.clientIp;
+    if (eventData.userAgent) userData.client_user_agent = eventData.userAgent;
+    if (hashedPhone) userData.ph = [hashedPhone];
+    if (hashedEmail) userData.em = [hashedEmail];
+
+    const payload: Record<string, unknown> = {
       data: [
         {
           event_name: eventName,
           event_time: Math.floor(Date.now() / 1000),
           action_source: 'website',
-          user_data: {
-            client_ip_address: eventData.clientIp,
-            client_user_agent: eventData.userAgent,
-            ...(eventData.phone ? { ph: [eventData.phone] } : {}),
-            ...(eventData.email ? { em: [eventData.email] } : {}),
-          },
+          user_data: userData,
           custom_data: {
             currency: eventData.currency || 'BDT',
             value: eventData.value,
@@ -287,12 +313,23 @@ export async function sendServerCapiEvent(
       ],
     };
 
-    // Fire and forget fetch
+    if (process.env.FB_TEST_EVENT_CODE) {
+      payload.test_event_code = process.env.FB_TEST_EVENT_CODE;
+    }
+
+    // Fire and forget fetch to Meta Graph API
     fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    }).catch((err) => console.warn('[CAPI] Asynchronous dispatch failed:', err));
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          console.warn('[CAPI] Meta API error:', data.error.message);
+        }
+      })
+      .catch((err) => console.warn('[CAPI] Asynchronous dispatch failed:', err));
   } catch (err) {
     console.warn('[CAPI] Error constructing payload:', err);
   }

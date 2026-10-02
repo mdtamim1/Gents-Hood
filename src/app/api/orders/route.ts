@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       currency: 'BDT',
       clientIp: ip,
       phone: order.shippingPhone,
+      userAgent: request.headers.get('user-agent') || undefined,
     }).catch(() => {});
 
     return NextResponse.json(
