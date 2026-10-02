@@ -7,6 +7,7 @@ import { StyleManifestoMarquee } from '@/components/landing/StyleManifestoMarque
 import { TrendingGrid } from '@/components/landing/TrendingGrid';
 import { getFeaturedProduct, getTrendingProducts } from '@/lib/services/product.service';
 import { getSiteSettings } from '@/lib/services/settings.service';
+import { getSiteUrl } from '@/lib/constants/site';
 
 // Incremental Static Regeneration (ISR) every 30 seconds
 export const revalidate = 30;
@@ -19,10 +20,7 @@ export default async function HomePage() {
     getTrendingProducts(8),
   ]);
 
-  const siteUrl =
-    process.env.NODE_ENV === 'production'
-      ? 'https://gentshood.com'
-      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+  const siteUrl = getSiteUrl();
 
   let parsedSocial: Record<string, string> = {};
   if (siteSettings?.socialLinks) {

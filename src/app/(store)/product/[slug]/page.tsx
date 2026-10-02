@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { getProductBySlug, getTrendingProducts } from '@/lib/services/product.service';
 import { ProductDetails } from '@/components/product/ProductDetails';
 import { ProductCard } from '@/components/product/ProductCard';
+import { getSiteUrl } from '@/lib/constants/site';
 
 export const revalidate = 30;
 
@@ -34,10 +35,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const siteUrl =
-    process.env.NODE_ENV === 'production'
-      ? 'https://gentshood.com'
-      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+  const siteUrl = getSiteUrl();
 
   const toAbsoluteUrl = (url: string) => {
     if (!url) return `${siteUrl}/images/logo.png`;
@@ -111,10 +109,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const siteUrl =
-    process.env.NODE_ENV === 'production'
-      ? 'https://gentshood.com'
-      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+  const siteUrl = getSiteUrl();
 
   const toAbsoluteUrl = (url: string) => {
     if (!url) return `${siteUrl}/images/logo.png`;

@@ -1,11 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { db } from '@/lib/db';
+import { getSiteUrl } from '@/lib/constants/site';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl =
-    process.env.NODE_ENV === 'production'
-      ? 'https://gentshood.com'
-      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+  const baseUrl = getSiteUrl();
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {

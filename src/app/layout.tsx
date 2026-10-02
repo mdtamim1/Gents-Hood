@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter_Tight, Cinzel, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { MetaPixel } from '@/components/analytics/MetaPixel';
+import { getSiteUrl } from '@/lib/constants/site';
 
 const interTight = Inter_Tight({
   subsets: ['latin'],
@@ -24,10 +25,7 @@ const playfair = Playfair_Display({
   weight: ['500', '600', '700', '800', '900'],
 });
 
-const siteUrl =
-  process.env.NODE_ENV === 'production'
-    ? 'https://gentshood.com'
-    : (process.env.NEXT_PUBLIC_SITE_URL || 'https://gentshood.com').replace(/\/+$/, '');
+const siteUrl = getSiteUrl();
 
 export const viewport: Viewport = {
   themeColor: '#171718',
