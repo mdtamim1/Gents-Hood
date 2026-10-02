@@ -45,9 +45,9 @@ export interface AnnouncementItemData {
 }
 
 const DEFAULT_GALLERY_STRIP: GalleryStripItem[] = [
-  { id: '1', title: 'Front View', image: '/images/gallery-front.jpg' },
-  { id: '2', title: 'Texture & Detail', image: '/images/gallery-detail.jpg' },
-  { id: '3', title: 'Silhouette Fit', image: '/images/gallery-lifestyle.jpg' },
+  { id: '1', title: 'Front View', image: '/images/logo.png' },
+  { id: '2', title: 'Texture & Detail', image: '/images/logo.png' },
+  { id: '3', title: 'Silhouette Fit', image: '/images/logo.png' },
 ];
 
 const DEFAULT_FAQS: FAQItemData[] = [
@@ -168,7 +168,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
     instagram: 'https://instagram.com/gentshood',
     tiktok: 'https://tiktok.com/@gentshood',
     youtube: 'https://youtube.com/@gentshood',
-    whatsapp: 'https://wa.me/8801700000000',
+    whatsapp: 'https://wa.me/8801623095187',
     messenger: 'https://m.me/gentshood',
   };
   if (initialSettings.socialLinks) {
@@ -253,10 +253,10 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
     freeDeliveryMin: initialSettings.freeDeliveryMin ?? 3000,
     insideDhaka: parsedCharges.insideDhaka || 70,
     outsideDhaka: parsedCharges.outsideDhaka || 130,
-    contactPhone: initialSettings.contactPhone || '+8801700000000',
-    contactEmail: initialSettings.contactEmail || 'contact@gentshood.com',
-    whatsapp: initialSettings.whatsapp || '+8801700000000',
-    address: initialSettings.address || 'Gulshan 2, Dhaka, Bangladesh',
+    contactPhone: initialSettings.contactPhone || '01623-095187',
+    contactEmail: initialSettings.contactEmail || 'gentshoodd@gmail.com',
+    whatsapp: initialSettings.whatsapp || '01623-095187',
+    address: initialSettings.address || 'Faridpur, Dhaka, Bangladesh',
     facebook: parsedSocial.facebook || '',
     instagram: parsedSocial.instagram || '',
     tiktok: parsedSocial.tiktok || '',
@@ -1190,7 +1190,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                         {
                           id: String(Date.now()),
                           title: `Card #${form.galleryStrip.length + 1}`,
-                          image: '/images/gallery-front.jpg',
+                          image: '/images/logo.png',
                         },
                       ],
                     })
@@ -1237,7 +1237,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                         alt={item.title}
                         className="h-full w-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/gallery-front.jpg';
+                          (e.target as HTMLImageElement).src = '/images/logo.png';
                         }}
                       />
                       {uploadingGalleryIdx === idx && (
@@ -1299,7 +1299,7 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
                           updated[idx] = { ...updated[idx], image: e.target.value };
                           setForm({ ...form, galleryStrip: updated });
                         }}
-                        placeholder="/images/gallery-front.jpg"
+                        placeholder="/images/logo.png"
                         className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 font-mono text-[11px] text-white/80 placeholder:text-white/20 focus:border-[#D4AF37] focus:outline-none"
                       />
                     </div>

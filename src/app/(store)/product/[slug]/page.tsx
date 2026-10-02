@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return `${siteUrl}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  const primaryImage = product.images[0]?.url || '/images/gallery-front.jpg';
+  const primaryImage = product.images[0]?.url || '/images/logo.png';
   const absolutePrimaryImage = toAbsoluteUrl(primaryImage);
 
   const ogImages =

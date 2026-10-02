@@ -28,10 +28,10 @@ interface FooterContentProps {
 }
 
 export function FooterContent({
-  contactPhone = '+8801700000000',
-  contactEmail = 'contact@gentshood.com',
-  whatsapp = '+8801700000000',
-  address = 'Gulshan 2, Dhaka, Bangladesh',
+  contactPhone = '01623-095187',
+  contactEmail = 'gentshoodd@gmail.com',
+  whatsapp = '01623-095187',
+  address = 'Faridpur, Dhaka, Bangladesh',
   socialLinks = {},
 }: FooterContentProps) {
   const scrollToTop = () => {

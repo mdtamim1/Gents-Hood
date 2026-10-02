@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { trackViewContent, trackAddToCart } from '@/lib/analytics';
 
+const STANDARD_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
 interface ProductDetailsProps {
   product: ProductWithRelations;
 }
@@ -18,6 +20,7 @@ interface ProductDetailsProps {
 export function ProductDetails({ product }: ProductDetailsProps) {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
+  const setDirectBuyItem = useCartStore((state) => state.setDirectBuyItem);
   const setIsCartOpen = useCartStore((state) => state.setIsOpen);
   const { showToast } = useToast();
   const orderBtnRef = useRef<HTMLButtonElement>(null);
@@ -49,17 +52,24 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     return Array.from(map.entries()).map(([name, hex]) => ({ name, hex }));
   }, [product]);
 
-  // Extract unique sizes
+  // Extract unique sizes sorted in standard garment order
   const sizes = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
       return ['S', 'M', 'L', 'XL', 'XXL'];
     }
     const set = new Set<string>();
     product.variants.forEach((v) => set.add(v.size));
-    return Array.from(set);
+    return Array.from(set).sort((a, b) => {
+      const idxA = STANDARD_SIZE_ORDER.indexOf(a);
+      const idxB = STANDARD_SIZE_ORDER.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
   }, [product]);
 
-  const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name || 'Charcoal Black');
+  const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name || 'Wine');
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
@@ -75,28 +85,71 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     const map = new Map<string, number>();
     (product.images || []).forEach((img, idx) => {
       if ((img as { colorHex?: string | null }).colorHex) {
-        map.set((img as { colorHex?: string | null }).colorHex!, idx);
+        map.set((img as { colorHex?: string | null }).colorHex!.toLowerCase(), idx);
       }
     });
     return map;
   }, [product.images]);
 
-  // When color changes, switch to matched image if color-image mapping exists
+  // Variants available specifically for the currently selected color
+  const selectedColorVariants = useMemo(() => {
+    if (!product.variants) return [];
+    return product.variants.filter((v) => v.color.toLowerCase() === selectedColor.toLowerCase());
+  }, [product.variants, selectedColor]);
+
+  // Auto-select first available size when color is chosen or on initial mount
+  useEffect(() => {
+    if (selectedColorVariants.length > 0) {
+      const hasCurrent = selectedColorVariants.some(
+        (v) => v.size.toLowerCase() === selectedSize.toLowerCase() && v.stock > 0
+      );
+      if (!hasCurrent) {
+        const firstAvail = selectedColorVariants.find((v) => v.stock > 0);
+        if (firstAvail) setSelectedSize(firstAvail.size);
+      }
+    }
+  }, [selectedColorVariants, selectedSize]);
+
+  // When color changes, switch to matched image if color-image mapping exists & auto-adjust size
   const handleColorSelect = (colorName: string, colorHex: string) => {
     setSelectedColor(colorName);
-    setSelectedSize('');
-    const mappedIdx = colorImageMap.get(colorHex);
+    setQuantity(1);
+
+    const newColorVariants = (product.variants || []).filter(
+      (v) => v.color.toLowerCase() === colorName.toLowerCase()
+    );
+    const hasCurrentSize = newColorVariants.some(
+      (v) => v.size.toLowerCase() === selectedSize.toLowerCase() && v.stock > 0
+    );
+    if (!hasCurrentSize) {
+      const firstAvailable = newColorVariants.find((v) => v.stock > 0);
+      setSelectedSize(firstAvailable ? firstAvailable.size : '');
+    }
+
+    const hexKey = colorHex?.toLowerCase();
+    const mappedIdx = hexKey ? colorImageMap.get(hexKey) : undefined;
     if (mappedIdx !== undefined) {
       setActiveImageIndex(mappedIdx);
+    } else {
+      const altIdx = (product.images || []).findIndex((img) =>
+        img.alt?.toLowerCase().includes(colorName.toLowerCase())
+      );
+      if (altIdx !== -1) {
+        setActiveImageIndex(altIdx);
+      }
     }
   };
 
   // Selected variant for stock check
   const activeVariant = useMemo(() => {
-    return product.variants?.find((v) => v.color === selectedColor && v.size === selectedSize);
+    return product.variants?.find(
+      (v) =>
+        v.color.toLowerCase() === selectedColor.toLowerCase() &&
+        v.size.toLowerCase() === selectedSize.toLowerCase()
+    );
   }, [product, selectedColor, selectedSize]);
 
-  const stockRemaining = activeVariant ? activeVariant.stock : 8;
+  const stockRemaining = activeVariant ? activeVariant.stock : 0;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -128,9 +181,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     }
 
     const currentImage =
-      product.images[activeImageIndex]?.url ||
-      product.images[0]?.url ||
-      '/images/gallery-front.jpg';
+      product.images[activeImageIndex]?.url || product.images[0]?.url || '/images/logo.png';
 
     addItem({
       productId: product.id,
@@ -161,11 +212,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     if (e) triggerRipple(e);
 
     const currentImage =
-      product.images[activeImageIndex]?.url ||
-      product.images[0]?.url ||
-      '/images/gallery-front.jpg';
+      product.images[activeImageIndex]?.url || product.images[0]?.url || '/images/logo.png';
 
-    addItem({
+    // Set ONLY this item for direct checkout - does NOT touch or pollute the shopping cart
+    setDirectBuyItem({
       productId: product.id,
       variantId: activeVariant?.id || `${selectedColor}-${selectedSize}`,
       name: product.name,
@@ -183,7 +233,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     });
 
     setIsCartOpen(false);
-    setTimeout(() => router.push('/checkout'), 300);
+    setTimeout(() => router.push('/checkout?direct=true'), 300);
   };
 
   // ─── Thumbnail scroll helpers ───
@@ -204,7 +254,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const images =
     product.images && product.images.length > 0
       ? product.images
-      : [{ id: '1', url: '/images/gallery-front.jpg', alt: product.name }];
+      : [{ id: '1', url: '/images/logo.png', alt: product.name }];
 
   const discount = product.comparePrice
     ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
@@ -403,16 +453,28 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </button>
             </div>
 
-            {/* Size chips — tall editorial style */}
+            {/* Size chips — tall editorial style with Color-wise availability */}
             <div className="flex flex-wrap gap-2">
               {sizes.map((size) => {
                 const isSelected = selectedSize === size;
+                const sizeVariant = selectedColorVariants.find(
+                  (v) => v.size.toLowerCase() === size.toLowerCase()
+                );
+                const isAvailable = Boolean(sizeVariant && sizeVariant.stock > 0);
+                const stockCount = sizeVariant ? sizeVariant.stock : 0;
+
                 return (
                   <button
                     key={size}
                     type="button"
-                    onClick={() => setSelectedSize(size)}
-                    className="group relative overflow-hidden transition-all duration-300 active:scale-95"
+                    disabled={!isAvailable}
+                    onClick={() => {
+                      if (isAvailable) setSelectedSize(size);
+                      else showToast(`${size} is out of stock in ${selectedColor}`, 'danger');
+                    }}
+                    className={`group relative overflow-hidden transition-all duration-300 ${
+                      !isAvailable ? 'cursor-not-allowed opacity-35' : 'active:scale-95'
+                    }`}
                     style={{
                       minWidth: '52px',
                       height: '52px',
@@ -422,23 +484,50 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                       fontWeight: 900,
                       letterSpacing: '0.12em',
                       textTransform: 'uppercase',
-                      color: isSelected ? '#fff' : '#1a1a1a',
+                      color: isSelected ? '#fff' : isAvailable ? '#1a1a1a' : '#888',
                       background: isSelected
                         ? 'linear-gradient(135deg, #2a0a10 0%, #4A0E17 40%, #7f1128 100%)'
-                        : 'transparent',
-                      border: isSelected ? '1.5px solid #4A0E17' : '1.5px solid rgba(0,0,0,0.15)',
+                        : isAvailable
+                          ? 'transparent'
+                          : 'rgba(0,0,0,0.03)',
+                      border: isSelected
+                        ? '1.5px solid #4A0E17'
+                        : isAvailable
+                          ? '1.5px solid rgba(0,0,0,0.15)'
+                          : '1px dashed rgba(0,0,0,0.15)',
                       boxShadow: isSelected
                         ? '0 8px 24px rgba(74,14,23,0.45), inset 0 1px 0 rgba(255,255,255,0.12)'
                         : '0 1px 4px rgba(0,0,0,0.06)',
                       transform: isSelected ? 'translateY(-3px)' : 'translateY(0)',
                     }}
                   >
+                    {/* Diagonal strike-through line if unavailable */}
+                    {!isAvailable && (
+                      <span
+                        className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                        aria-hidden="true"
+                      >
+                        <span className="h-[1.5px] w-full rotate-[-25deg] bg-red-500/60" />
+                      </span>
+                    )}
+
                     {/* Shine effect */}
-                    <span
-                      className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-500 group-hover:translate-x-full"
-                      aria-hidden="true"
-                    />
-                    <span className="relative z-10">{size}</span>
+                    {isAvailable && (
+                      <span
+                        className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-500 group-hover:translate-x-full"
+                        aria-hidden="true"
+                      />
+                    )}
+
+                    <span className="relative z-10 flex flex-col items-center leading-none">
+                      <span>{size}</span>
+                      {isAvailable && stockCount <= 3 && (
+                        <span className="mt-0.5 text-[8px] font-bold text-amber-600">
+                          {stockCount} left
+                        </span>
+                      )}
+                    </span>
+
                     {/* Bottom glow bar */}
                     {isSelected && (
                       <span
@@ -897,12 +986,15 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                     'Engineered with relaxed shoulders for seamless layering. Fits true to size with a clean contemporary profile.'}
                 </p>
                 {/* Mini size chart preview */}
-                <div className="overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+                <div
+                  className="overflow-hidden rounded-lg"
+                  style={{ border: '1.5px solid rgba(0,0,0,0.12)' }}
+                >
                   <div
-                    className="grid grid-cols-5"
-                    style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
+                    className="grid grid-cols-3 bg-[#111113] text-white"
+                    style={{ borderBottom: '1.5px solid rgba(0,0,0,0.12)' }}
                   >
-                    {['S', 'M', 'L', 'XL', 'XXL'].map((s) => (
+                    {['M', 'L', 'XL'].map((s) => (
                       <div
                         key={s}
                         className="py-2 text-center"
@@ -910,13 +1002,13 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                           background:
                             selectedSize === s
                               ? 'linear-gradient(135deg,#2a0a10,#4A0E17)'
-                              : 'rgba(255,255,255,0.6)',
-                          borderRight: '1px solid rgba(0,0,0,0.08)',
+                              : '#171718',
+                          borderRight: s !== 'XL' ? '1px solid rgba(255,255,255,0.12)' : 'none',
                         }}
                       >
                         <span
-                          className={`text-[10px] font-black uppercase ${
-                            selectedSize === s ? 'text-white' : 'text-ink/50'
+                          className={`text-[11px] font-black uppercase tracking-wider ${
+                            selectedSize === s ? 'text-white' : 'text-zinc-300'
                           }`}
                         >
                           {s}
@@ -924,14 +1016,17 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-5">
-                    {['40"', '42"', '44"', '46"', '48"'].map((chest) => (
-                      <div
-                        key={chest}
-                        className="bg-white/40 py-2 text-center"
-                        style={{ borderRight: '1px solid rgba(0,0,0,0.06)' }}
-                      >
-                        <span className="text-ink/40 text-[9px] font-semibold">{chest}</span>
+                  <div className="grid grid-cols-3 divide-x divide-zinc-200 bg-white">
+                    {[
+                      { chest: '40 in', length: '27 in' },
+                      { chest: '42 in', length: '28 in' },
+                      { chest: '44 in', length: '29 in' },
+                    ].map((m, idx) => (
+                      <div key={idx} className="py-2 text-center">
+                        <span className="block text-[11px] font-black text-ink">{m.chest}</span>
+                        <span className="block text-[9px] font-semibold text-zinc-500">
+                          {m.length}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -963,52 +1058,66 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         </div>
       </div>
 
-      {/* ── SIZE GUIDE MODAL ── */}
+      {/* ── SIZE GUIDE MODAL (Exact match to official Gents Hood Measurement Chart) ── */}
       <Modal
         isOpen={isSizeGuideOpen}
         onClose={() => setIsSizeGuideOpen(false)}
-        title="Gents Hood Size Chart & Measurement"
-        maxWidth="lg"
+        title="Official Garment Size Guide"
+        maxWidth="md"
       >
-        <div className="space-y-5 text-xs text-ink">
-          <p className="text-muted">
-            All measurements in inches. Measure a similar garment that fits you well flat on a
-            table.
-          </p>
-          <div className="overflow-x-auto border border-line">
-            <table className="w-full border-collapse text-left text-xs">
+        <div className="space-y-6 text-xs text-ink">
+          {/* Header Card matching user's image branding */}
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-[#0f0f11] px-6 py-6 text-center text-white shadow-xl">
+            <h3 className="font-serif text-2xl font-black tracking-tight text-white sm:text-3xl">
+              Gents Hood
+            </h3>
+            <div className="mt-2.5 inline-block rounded-full border border-white/60 px-5 py-1 text-xs font-bold tracking-wide text-white">
+              Premium Shirt Size Guide
+            </div>
+          </div>
+
+          {/* Clean High-Contrast Measurement Table */}
+          <div className="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
+            <table className="w-full border-collapse text-center">
               <thead>
-                <tr className="border-b border-line bg-cream-soft text-[11px] font-semibold uppercase tracking-wider">
-                  {['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'].map(
-                    (h) => (
-                      <th key={h} className="p-3">
-                        {h}
-                      </th>
-                    )
-                  )}
+                <tr className="bg-black text-white">
+                  <th className="border-r border-white/20 py-3.5 text-xs font-black uppercase tracking-widest sm:text-sm">
+                    SIZE
+                  </th>
+                  <th className="border-r border-white/20 py-3.5 text-xs font-black uppercase tracking-widest sm:text-sm">
+                    CHEST
+                  </th>
+                  <th className="py-3.5 text-xs font-black uppercase tracking-widest sm:text-sm">
+                    LENGTH
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line font-mono">
-                {[
-                  ['S', '40', '29.5', '18.5', '24.5'],
-                  ['M', '42', '30.5', '19.2', '25.0'],
-                  ['L', '44', '31.5', '20.0', '25.5'],
-                  ['XL', '46', '32.5', '20.8', '26.0'],
-                  ['XXL', '48', '33.5', '21.5', '26.5'],
-                ].map(([size, ...vals]) => (
-                  <tr key={size}>
-                    <td className="p-3 font-sans font-semibold">{size}</td>
-                    {vals.map((v, i) => (
-                      <td key={i} className="p-3">
-                        {v}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+              <tbody className="divide-y-2 divide-black text-sm font-bold text-ink sm:text-base">
+                <tr className="transition-colors hover:bg-zinc-50">
+                  <td className="border-r-2 border-black py-4 font-black">M</td>
+                  <td className="border-r-2 border-black py-4">40 in</td>
+                  <td className="py-4">27 in</td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50">
+                  <td className="border-r-2 border-black py-4 font-black">L</td>
+                  <td className="border-r-2 border-black py-4">42 in</td>
+                  <td className="py-4">28 in</td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50">
+                  <td className="border-r-2 border-black py-4 font-black">XL</td>
+                  <td className="border-r-2 border-black py-4">44 in</td>
+                  <td className="py-4">29 in</td>
+                </tr>
               </tbody>
             </table>
           </div>
-          <div className="flex justify-end pt-2">
+
+          <p className="text-center text-[11px] text-muted">
+            All measurements in inches. Measure a similar shirt flat on a table (armpit to armpit
+            for chest, collar seam to hem for length).
+          </p>
+
+          <div className="flex justify-end pt-1">
             <Button variant="primary" size="sm" onClick={() => setIsSizeGuideOpen(false)}>
               Got it
             </Button>

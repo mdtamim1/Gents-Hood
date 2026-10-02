@@ -133,7 +133,7 @@ export async function createOrder(input: CreateOrderInput) {
         colorSnapshot: item.color,
         priceSnapshot: price,
         qty: item.quantity,
-        imageSnapshot: product.images[0]?.url || '/images/new-vibes-main.jpg',
+        imageSnapshot: product.images[0]?.url || '/images/logo.png',
       });
     }
 

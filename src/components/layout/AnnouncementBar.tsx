@@ -42,7 +42,10 @@ interface AnnouncementBarProps {
   items?: { id: string; text: string; link?: string; icon?: string }[];
 }
 
-export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
+export const AnnouncementBar = React.memo(function AnnouncementBar({
+  text,
+  items,
+}: AnnouncementBarProps) {
   const displayItems = React.useMemo(() => {
     if (items && items.length > 0) return items;
     if (text) {
@@ -62,11 +65,11 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
     return ANNOUNCEMENT_ITEMS;
   }, [items, text]);
 
-  // Ensure each set has at least 12 items so that it fills any screen width without empty gaps
+  // Keep marquee track under ~2500px per set to stay within mobile GPU texture limits and prevent micro-stutters
   const seamlessItems = React.useMemo(() => {
     if (!displayItems || displayItems.length === 0) return displayItems;
     let list = displayItems;
-    while (list.length < 12) {
+    while (list.length < 4) {
       list = [...list, ...displayItems];
     }
     return list;
@@ -79,12 +82,22 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
       style={{
         background: 'linear-gradient(90deg, #1b0407 0%, #4A0E17 50%, #1b0407 100%)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+        contain: 'paint layout',
+        transform: 'translate3d(0,0,0)',
+        WebkitTransform: 'translate3d(0,0,0)',
       }}
     >
-      {/* Seamless Infinite Auto-Sliding Marquee Track */}
+      {/* Seamless Infinite Auto-Sliding Marquee Track with Hardware Acceleration */}
       <div
         className="animate-marquee-ticker flex items-center whitespace-nowrap"
-        style={{ animationDuration: '30s' }}
+        style={{
+          animationDuration: '28s',
+          willChange: 'transform',
+          transform: 'translate3d(0,0,0)',
+          WebkitTransform: 'translate3d(0,0,0)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+        }}
       >
         {/* Set 1 */}
         {seamlessItems.map((item, idx) => (
@@ -116,4 +129,4 @@ export function AnnouncementBar({ text, items }: AnnouncementBarProps) {
       </div>
     </aside>
   );
-}
+});

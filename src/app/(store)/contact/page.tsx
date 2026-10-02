@@ -7,7 +7,7 @@ import { ContactForm } from './ContactForm';
 export const metadata: Metadata = {
   title: 'Contact Us — GENTS HOOD Atelier',
   description:
-    'Get in touch with the Gents Hood team. Direct WhatsApp concierge, showroom visits in Gulshan 2, Dhaka, and customer service inquiries.',
+    'Get in touch with the Gents Hood team. Direct WhatsApp concierge, customer service, and support across Bangladesh.',
   openGraph: {
     title: 'Contact Us — GENTS HOOD Atelier',
     description:
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
 export default async function ContactPage() {
   const settings = await getSiteSettings();
 
-  const phone = settings.contactPhone || '+8801700000000';
-  const email = settings.contactEmail || 'contact@gentshood.com';
-  const whatsapp = settings.whatsapp || '+8801700000000';
-  const address = settings.address || 'Gulshan 2, Dhaka, Bangladesh';
+  const phone = settings.contactPhone || '01623-095187';
+  const email = settings.contactEmail || 'gentshoodd@gmail.com';
+  const whatsapp = settings.whatsapp || '01623-095187';
+  const address = settings.address || 'Faridpur, Dhaka, Bangladesh';
   const cleanWaNumber = whatsapp.replace(/[^\d]/g, '');
 
   return (

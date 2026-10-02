@@ -14,20 +14,20 @@ const DEFAULT_GALLERY_ITEMS: GalleryPreviewItem[] = [
   {
     id: '1',
     title: 'Front View',
-    image: '/images/gallery-front.jpg',
-    alt: 'Product Front Silhouette View',
+    image: '/images/logo.png',
+    alt: 'Gents Hood Front View',
   },
   {
     id: '2',
     title: 'Texture & Detail',
-    image: '/images/gallery-detail.jpg',
-    alt: 'Fabric Weave & Texture Detail',
+    image: '/images/logo.png',
+    alt: 'Gents Hood Texture & Detail',
   },
   {
     id: '3',
     title: 'Silhouette Fit',
-    image: '/images/gallery-lifestyle.jpg',
-    alt: 'Lookbook Lifestyle Fit Silhouette',
+    image: '/images/logo.png',
+    alt: 'Gents Hood Silhouette Fit',
   },
 ];
 

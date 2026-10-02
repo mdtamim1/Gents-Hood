@@ -168,7 +168,7 @@ export function OrderSuccessClient({ order, siteSettings }: OrderSuccessClientPr
     minute: '2-digit',
   });
 
-  const whatsappNumber = siteSettings?.whatsapp || '+8801700000000';
+  const whatsappNumber = siteSettings?.whatsapp || '01623-095187';
   const cleanWaNumber = whatsappNumber.replace(/[^\d]/g, '');
   const firstName = order.shippingName.split(' ')[0] || 'Sir';
 
@@ -386,7 +386,7 @@ export function OrderSuccessClient({ order, siteSettings }: OrderSuccessClientPr
                   <div className="flex min-w-0 items-center gap-3.5">
                     <div className="relative h-16 w-14 shrink-0 overflow-hidden border border-line bg-cream shadow-sm">
                       <Image
-                        src={item.imageSnapshot || '/images/gallery-front.jpg'}
+                        src={item.imageSnapshot || '/images/logo.png'}
                         alt={item.nameSnapshot}
                         fill
                         sizes="56px"

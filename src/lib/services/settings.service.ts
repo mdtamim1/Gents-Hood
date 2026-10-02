@@ -10,10 +10,10 @@ export async function getSiteSettings() {
         data: {
           announcementText: null,
           freeDeliveryMin: 0,
-          contactPhone: '+8801700000000',
-          contactEmail: 'contact@gentshood.com',
-          whatsapp: '+8801700000000',
-          address: 'Gulshan 2, Dhaka, Bangladesh',
+          contactPhone: '01623-095187',
+          contactEmail: 'gentshoodd@gmail.com',
+          whatsapp: '01623-095187',
+          address: 'Faridpur, Dhaka, Bangladesh',
           heroTagline: 'Fashion That Moves With You',
           heroBackgroundWord: 'GENTS HOOD',
           deliveryCharges: JSON.stringify({

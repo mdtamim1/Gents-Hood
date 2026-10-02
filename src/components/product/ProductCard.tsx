@@ -25,7 +25,7 @@ export function ProductCard({ product }: ProductCardProps) {
     }, 220);
   };
 
-  const primaryImage = product.images[0]?.url || '/images/gallery-front.jpg';
+  const primaryImage = product.images[0]?.url || '/images/logo.png';
   const secondaryImage = product.images[1]?.url || primaryImage;
   const hasMultipleImages = product.images.length > 1;
 

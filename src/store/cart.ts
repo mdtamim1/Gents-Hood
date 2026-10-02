@@ -3,11 +3,14 @@ import { CartItemType } from '@/types';
 
 interface CartState {
   items: CartItemType[];
+  directBuyItem: CartItemType | null;
   isOpen: boolean;
   addItem: (item: CartItemType) => void;
   removeItem: (productId: string, variantId?: string) => void;
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
   clearCart: () => void;
+  setDirectBuyItem: (item: CartItemType | null) => void;
+  clearDirectBuyItem: () => void;
   setIsOpen: (isOpen: boolean) => void;
   getTotalItems: () => number;
   getSubtotal: () => number;
@@ -15,6 +18,7 @@ interface CartState {
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  directBuyItem: null,
   isOpen: false,
   addItem: (newItem) => {
     set((state) => {
@@ -51,6 +55,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     }));
   },
   clearCart: () => set({ items: [] }),
+  setDirectBuyItem: (item) => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (item) {
+          sessionStorage.setItem('gh_direct_buy_item_v1', JSON.stringify(item));
+        } else {
+          sessionStorage.removeItem('gh_direct_buy_item_v1');
+        }
+      } catch {}
+    }
+    set({ directBuyItem: item });
+  },
+  clearDirectBuyItem: () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('gh_direct_buy_item_v1');
+      } catch {}
+    }
+    set({ directBuyItem: null });
+  },
   setIsOpen: (isOpen) => set({ isOpen }),
   getTotalItems: () => {
     return get().items.reduce((total, item) => total + item.quantity, 0);

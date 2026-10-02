@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShieldCheck,
   Truck,
@@ -56,7 +56,11 @@ const STORAGE_KEY = 'gh_checkout_data_v4';
 
 export function CheckoutForm() {
   const router = useRouter();
-  const { items, getSubtotal, clearCart } = useCartStore();
+  const searchParams = useSearchParams();
+  const isDirect = searchParams?.get('direct') === 'true';
+
+  const { items, directBuyItem, setDirectBuyItem, clearDirectBuyItem, getSubtotal, clearCart } =
+    useCartStore();
   const { showToast } = useToast();
 
   const [currentStep, setCurrentStep] = useState<'details' | 'payment'>('details');
@@ -71,7 +75,45 @@ export function CheckoutForm() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const subtotal = getSubtotal();
+  // Restore directBuyItem from sessionStorage if refreshed
+  useEffect(() => {
+    if (isDirect && !directBuyItem && typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('gh_direct_buy_item_v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.productId) {
+            setDirectBuyItem(parsed);
+          }
+        }
+      } catch {}
+    }
+  }, [isDirect, directBuyItem, setDirectBuyItem]);
+
+  // If direct buy, strictly isolate to directBuyItem; otherwise use regular cart items
+  const activeItems = useMemo(() => {
+    if (isDirect) {
+      if (directBuyItem) return [directBuyItem];
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = sessionStorage.getItem('gh_direct_buy_item_v1');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.productId) return [parsed];
+          }
+        } catch {}
+      }
+      return [];
+    }
+    return items;
+  }, [isDirect, directBuyItem, items]);
+
+  const subtotal = useMemo(() => {
+    if (isDirect) {
+      return activeItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+    }
+    return getSubtotal();
+  }, [isDirect, activeItems, getSubtotal]);
 
   // Load saved form values from sessionStorage if available
   useEffect(() => {
@@ -114,13 +156,13 @@ export function CheckoutForm() {
   // Generate unique idempotency key once on component mount & fire initiate_checkout event
   useEffect(() => {
     setIdempotencyKey(`IDEM-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
-    if (items.length > 0) {
+    if (activeItems.length > 0) {
       trackInitiateCheckout({
-        num_items: items.reduce((sum, i) => sum + i.quantity, 0),
+        num_items: activeItems.reduce((sum, i) => sum + i.quantity, 0),
         value: subtotal,
       });
     }
-  }, [items, subtotal]);
+  }, [activeItems, subtotal]);
 
   // Determine delivery charge dynamically based on district selection
   const isDhaka = shippingDistrict.toLowerCase().includes('dhaka');
@@ -190,8 +232,8 @@ export function CheckoutForm() {
   const handleContinueToPayment = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (items.length === 0) {
-      showToast('Your shopping bag is empty. Please add items to order.', 'danger');
+    if (activeItems.length === 0) {
+      showToast('There are no items in your order. Please select a product to order.', 'danger');
       return;
     }
 
@@ -203,7 +245,8 @@ export function CheckoutForm() {
     saveToStorage();
     setCurrentStep('payment');
     if (typeof window !== 'undefined') {
-      window.history.pushState({ step: 'payment' }, '', '/checkout?step=payment');
+      const nextUrl = isDirect ? '/checkout?direct=true&step=payment' : '/checkout?step=payment';
+      window.history.pushState({ step: 'payment' }, '', nextUrl);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -212,7 +255,8 @@ export function CheckoutForm() {
   const handleEditDetails = () => {
     setCurrentStep('details');
     if (typeof window !== 'undefined') {
-      window.history.pushState({ step: 'details' }, '', '/checkout');
+      const backUrl = isDirect ? '/checkout?direct=true' : '/checkout';
+      window.history.pushState({ step: 'details' }, '', backUrl);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -221,8 +265,8 @@ export function CheckoutForm() {
   const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (items.length === 0) {
-      showToast('Your shopping bag is empty. Please add items to order.', 'danger');
+    if (activeItems.length === 0) {
+      showToast('There are no items in your order. Please select a product to order.', 'danger');
       return;
     }
 
@@ -244,7 +288,7 @@ export function CheckoutForm() {
         note: note.trim() || undefined,
         idempotencyKey,
         paymentMethod: 'COD',
-        items: items.map((item) => ({
+        items: activeItems.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
           size: item.size,
@@ -269,7 +313,13 @@ export function CheckoutForm() {
       try {
         sessionStorage.removeItem(STORAGE_KEY);
       } catch {}
-      clearCart();
+
+      if (isDirect) {
+        clearDirectBuyItem();
+      } else {
+        clearCart();
+      }
+
       showToast('Order confirmed! Redirecting...', 'success');
       router.push(`/order-success/${data.order.orderNo}`);
     } catch (err: unknown) {
@@ -281,7 +331,7 @@ export function CheckoutForm() {
   };
 
   // Empty cart view
-  if (items.length === 0) {
+  if (activeItems.length === 0) {
     return (
       <div className="mx-auto max-w-[1280px] px-6 py-20 text-center">
         <p className="text-xs uppercase tracking-widest text-muted">
@@ -642,7 +692,7 @@ export function CheckoutForm() {
             <div className="space-y-4 border border-line bg-cream p-5 sm:p-6">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
-                  Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})
+                  Order Summary ({activeItems.length} {activeItems.length === 1 ? 'item' : 'items'})
                 </h3>
                 <span className="font-mono text-xs font-bold text-ink">
                   Total: {formatPrice(grandTotal)}
@@ -651,7 +701,7 @@ export function CheckoutForm() {
 
               {/* Items List */}
               <div className="max-h-64 divide-y divide-line overflow-y-auto pr-1">
-                {items.map((item) => (
+                {activeItems.map((item) => (
                   <div
                     key={`${item.productId}-${item.variantId || 'def'}`}
                     className="flex items-center justify-between gap-4 py-3"

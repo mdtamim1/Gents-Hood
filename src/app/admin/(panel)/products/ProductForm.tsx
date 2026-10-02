@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -17,6 +17,10 @@ import {
   Info,
   ChevronDown,
   Sparkles,
+  Check,
+  Copy,
+  LayoutGrid,
+  Table as TableIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -76,6 +80,136 @@ const PRESET_COLORS = [
   { name: 'Sand', hex: '#C4A882' },
   { name: 'Olive', hex: '#6B6944' },
 ];
+
+export interface ColorwaySize {
+  enabled: boolean;
+  stock: number;
+  sku?: string;
+}
+
+export interface ColorwayGroup {
+  id: string;
+  color: string;
+  colorHex: string;
+  imageIndex: number | null;
+  sizes: Record<string, ColorwaySize>;
+  customSizes: string[];
+}
+
+function buildInitialColorways(
+  initialVariants?: VariantInput[],
+  initialImages?: { url: string; colorHex?: string | null }[]
+): ColorwayGroup[] {
+  if (!initialVariants || initialVariants.length === 0) {
+    const defaultSizes: Record<string, ColorwaySize> = {};
+    SIZES.forEach((s) => {
+      const isDefault = ['M', 'L', 'XL'].includes(s);
+      defaultSizes[s] = {
+        enabled: isDefault,
+        stock: isDefault ? 10 : 0,
+      };
+    });
+    return [
+      {
+        id: 'cw-default-1',
+        color: 'Charcoal Black',
+        colorHex: '#171718',
+        imageIndex: 0,
+        sizes: defaultSizes,
+        customSizes: [],
+      },
+    ];
+  }
+
+  const groupsMap = new Map<
+    string,
+    { color: string; colorHex: string; variants: VariantInput[] }
+  >();
+  initialVariants.forEach((v) => {
+    const key = (v.colorHex || v.color || '#171718').toLowerCase();
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        color: v.color || 'Standard',
+        colorHex: v.colorHex || '#171718',
+        variants: [],
+      });
+    }
+    groupsMap.get(key)!.variants.push(v);
+  });
+
+  const result: ColorwayGroup[] = [];
+  let indexCounter = 1;
+  groupsMap.forEach((g, hexKey) => {
+    let imageIdx: number | null = null;
+    if (initialImages && initialImages.length > 0) {
+      const idx = initialImages.findIndex(
+        (img) => img.colorHex && img.colorHex.toLowerCase() === hexKey
+      );
+      if (idx !== -1) imageIdx = idx;
+    }
+
+    const sizesMap: Record<string, ColorwaySize> = {};
+    const customSizes: string[] = [];
+
+    SIZES.forEach((s) => {
+      sizesMap[s] = { enabled: false, stock: 10 };
+    });
+
+    g.variants.forEach((v) => {
+      if (SIZES.includes(v.size)) {
+        sizesMap[v.size] = {
+          enabled: true,
+          stock: v.stock,
+          sku: v.sku || undefined,
+        };
+      } else {
+        if (!customSizes.includes(v.size)) {
+          customSizes.push(v.size);
+        }
+        sizesMap[v.size] = {
+          enabled: true,
+          stock: v.stock,
+          sku: v.sku || undefined,
+        };
+      }
+    });
+
+    result.push({
+      id: `cw-${indexCounter++}`,
+      color: g.color,
+      colorHex: g.colorHex,
+      imageIndex: imageIdx,
+      sizes: sizesMap,
+      customSizes,
+    });
+  });
+
+  return result;
+}
+
+function compileVariants(colorways: ColorwayGroup[], baseSku?: string): VariantInput[] {
+  const result: VariantInput[] = [];
+  colorways.forEach((cw) => {
+    const allSizes = [...SIZES, ...cw.customSizes];
+    allSizes.forEach((size) => {
+      const sData = cw.sizes[size];
+      if (sData && sData.enabled) {
+        result.push({
+          size,
+          color: cw.color.trim() || 'Standard',
+          colorHex: cw.colorHex || '#171718',
+          stock: Math.max(0, Number(sData.stock) || 0),
+          sku:
+            sData.sku ||
+            (baseSku
+              ? `${baseSku.trim()}-${size}-${cw.color}`.toUpperCase().replace(/\s+/g, '-')
+              : undefined),
+        });
+      }
+    });
+  });
+  return result;
+}
 
 function generateSku(name: string): string {
   const words = name.trim().toUpperCase().split(/\s+/);
@@ -213,8 +347,11 @@ function ImageUploadBox({
           </div>
 
           {/* Color mapping */}
-          {!isPrimary && availableColors.length > 0 && (
+          {availableColors.length > 0 && (
             <div className="relative">
+              <label className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                {isPrimary ? 'Main Photo Colorway' : 'Mapped Colorway'}
+              </label>
               <button
                 type="button"
                 onClick={() => setShowColorPicker((p) => !p)}
@@ -227,14 +364,19 @@ function ImageUploadBox({
                       style={{ backgroundColor: image.colorHex }}
                     />
                     <span className="flex-1 text-left text-white">
-                      {availableColors.find((c) => c.hex === image.colorHex)?.name ||
-                        image.colorHex}
+                      {availableColors.find(
+                        (c) => c.hex.toLowerCase() === image.colorHex?.toLowerCase()
+                      )?.name || image.colorHex}
                     </span>
                   </>
                 ) : (
                   <>
                     <Palette className="h-3 w-3 flex-shrink-0 text-zinc-500" />
-                    <span className="flex-1 text-left text-zinc-500">Map to color (optional)</span>
+                    <span className="flex-1 text-left text-zinc-500">
+                      {isPrimary
+                        ? 'Link main photo to color (optional)'
+                        : 'Map to color (optional)'}
+                    </span>
                   </>
                 )}
                 <ChevronDown
@@ -261,13 +403,16 @@ function ImageUploadBox({
                         onColorHexChange(c.hex);
                         setShowColorPicker(false);
                       }}
-                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-colors hover:bg-white/[0.06] ${image.colorHex === c.hex ? 'text-white' : 'text-zinc-400'}`}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-colors hover:bg-white/[0.06] ${image.colorHex?.toLowerCase() === c.hex.toLowerCase() ? 'font-bold text-white' : 'text-zinc-400'}`}
                     >
                       <span
                         className="h-3 w-3 shrink-0 rounded-full border border-white/20"
                         style={{ backgroundColor: c.hex }}
                       />
-                      {c.name}
+                      <span className="flex-1 text-left">{c.name}</span>
+                      {image.colorHex?.toLowerCase() === c.hex.toLowerCase() && (
+                        <Check className="h-3 w-3 text-amber-400" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -335,27 +480,34 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     return initialData?.images?.some((img) => img.colorHex) ?? false;
   });
 
-  // ── Variants
-  const [variants, setVariants] = useState<VariantInput[]>(
-    initialData?.variants && initialData.variants.length > 0
-      ? initialData.variants
-      : [
-          { size: 'M', color: 'Charcoal Black', colorHex: '#171718', stock: 15 },
-          { size: 'L', color: 'Charcoal Black', colorHex: '#171718', stock: 12 },
-          { size: 'XL', color: 'Charcoal Black', colorHex: '#171718', stock: 8 },
-        ]
+  // ── Colorways & Variants state
+  const [colorways, setColorways] = useState<ColorwayGroup[]>(() =>
+    buildInitialColorways(initialData?.variants, initialData?.images)
+  );
+  const [viewMode, setViewMode] = useState<'matrix' | 'table'>('matrix');
+  const [newCustomSizeName, setNewCustomSizeName] = useState<Record<string, string>>({});
+
+  // ── Variants (kept in sync for table view & payload)
+  const [variants, setVariants] = useState<VariantInput[]>(() =>
+    compileVariants(
+      buildInitialColorways(initialData?.variants, initialData?.images),
+      initialData?.sku || undefined
+    )
   );
 
-  // ── Unique colors derived from variants
-  const availableColors = React.useMemo(() => {
-    const map = new Map<string, string>();
-    variants.forEach((v) => {
-      if (v.color && v.colorHex && !map.has(v.colorHex)) {
-        map.set(v.colorHex, v.color);
-      }
-    });
-    return Array.from(map.entries()).map(([hex, name]) => ({ hex, name }));
-  }, [variants]);
+  // Sync variants whenever colorways changes
+  useEffect(() => {
+    if (viewMode === 'matrix') {
+      setVariants(compileVariants(colorways, sku));
+    }
+  }, [colorways, sku, viewMode]);
+
+  // ── Unique colors derived from colorways
+  const availableColors = useMemo(() => {
+    return colorways
+      .filter((cw) => cw.color.trim() && cw.colorHex)
+      .map((cw) => ({ hex: cw.colorHex, name: cw.color }));
+  }, [colorways]);
 
   // ── Upload image helper
   const uploadImage = useCallback(
@@ -395,20 +547,292 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.imageIndex === index) return { ...cw, imageIndex: null };
+        if (cw.imageIndex !== null && cw.imageIndex > index) {
+          return { ...cw, imageIndex: cw.imageIndex - 1 };
+        }
+        return cw;
+      })
+    );
   };
 
-  // ── Variants helpers
+  // ── Colorway Handlers
+  const addColorway = () => {
+    const usedHexes = new Set(colorways.map((c) => c.colorHex.toLowerCase()));
+    const nextPreset = PRESET_COLORS.find((p) => !usedHexes.has(p.hex.toLowerCase())) || {
+      name: `Colorway ${colorways.length + 1}`,
+      hex: '#2A2E33',
+    };
+
+    const defaultSizes: Record<string, ColorwaySize> = {};
+    SIZES.forEach((s) => {
+      const isDefault = ['M', 'L', 'XL'].includes(s);
+      defaultSizes[s] = {
+        enabled: isDefault,
+        stock: isDefault ? 10 : 0,
+      };
+    });
+
+    const newCw: ColorwayGroup = {
+      id: 'cw-' + Date.now(),
+      color: nextPreset.name,
+      colorHex: nextPreset.hex,
+      imageIndex: null,
+      sizes: defaultSizes,
+      customSizes: [],
+    };
+
+    setColorways((prev) => [...prev, newCw]);
+    showToast(`Added ${nextPreset.name} colorway!`, 'info');
+  };
+
+  const removeColorway = (id: string) => {
+    if (colorways.length <= 1) {
+      showToast('At least one colorway is required', 'danger');
+      return;
+    }
+    const cwToRemove = colorways.find((c) => c.id === id);
+    setColorways((prev) => prev.filter((c) => c.id !== id));
+    if (cwToRemove?.imageIndex !== null) {
+      setImages((prev) =>
+        prev.map((img, idx) => (idx === cwToRemove?.imageIndex ? { ...img, colorHex: null } : img))
+      );
+    }
+    showToast(`Removed colorway`, 'info');
+  };
+
+  const duplicateColorway = (id: string) => {
+    const source = colorways.find((c) => c.id === id);
+    if (!source) return;
+
+    const usedHexes = new Set(colorways.map((c) => c.colorHex.toLowerCase()));
+    const nextPreset = PRESET_COLORS.find((p) => !usedHexes.has(p.hex.toLowerCase())) || {
+      name: `${source.color} (Copy)`,
+      hex: '#4A0E17',
+    };
+
+    const copiedSizes: Record<string, ColorwaySize> = {};
+    Object.entries(source.sizes).forEach(([size, data]) => {
+      copiedSizes[size] = { ...data };
+    });
+
+    const newCw: ColorwayGroup = {
+      id: 'cw-' + Date.now(),
+      color: nextPreset.name,
+      colorHex: nextPreset.hex,
+      imageIndex: null,
+      sizes: copiedSizes,
+      customSizes: [...source.customSizes],
+    };
+
+    setColorways((prev) => [...prev, newCw]);
+    showToast(`Duplicated ${source.color} as ${nextPreset.name}!`, 'success');
+  };
+
+  const updateColorway = (id: string, updates: Partial<ColorwayGroup>) => {
+    setColorways((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const next = { ...c, ...updates };
+        if (updates.color && !updates.colorHex) {
+          const preset = PRESET_COLORS.find(
+            (p) => p.name.toLowerCase() === updates.color!.toLowerCase()
+          );
+          if (preset) {
+            next.colorHex = preset.hex;
+            if (c.imageIndex !== null) {
+              setImages((imgs) =>
+                imgs.map((img, idx) =>
+                  idx === c.imageIndex ? { ...img, colorHex: preset.hex } : img
+                )
+              );
+            }
+          }
+        }
+        if (updates.colorHex && c.imageIndex !== null) {
+          setImages((imgs) =>
+            imgs.map((img, idx) =>
+              idx === c.imageIndex ? { ...img, colorHex: updates.colorHex! } : img
+            )
+          );
+        }
+        return next;
+      })
+    );
+  };
+
+  const toggleSize = (colorwayId: string, size: string) => {
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        const current = cw.sizes[size] || { enabled: false, stock: 10 };
+        return {
+          ...cw,
+          sizes: {
+            ...cw.sizes,
+            [size]: {
+              ...current,
+              enabled: !current.enabled,
+              stock: !current.enabled && current.stock === 0 ? 10 : current.stock,
+            },
+          },
+        };
+      })
+    );
+  };
+
+  const updateSizeStock = (colorwayId: string, size: string, stock: number) => {
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        const current = cw.sizes[size] || { enabled: true, stock: 0 };
+        return {
+          ...cw,
+          sizes: {
+            ...cw.sizes,
+            [size]: {
+              ...current,
+              stock: Math.max(0, stock),
+            },
+          },
+        };
+      })
+    );
+  };
+
+  const enableSizesPreset = (colorwayId: string, sizesToEnable: string[]) => {
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        const nextSizes = { ...cw.sizes };
+        sizesToEnable.forEach((s) => {
+          nextSizes[s] = {
+            enabled: true,
+            stock: nextSizes[s]?.stock > 0 ? nextSizes[s].stock : 10,
+          };
+        });
+        return { ...cw, sizes: nextSizes };
+      })
+    );
+  };
+
+  const disableAllSizesForColorway = (colorwayId: string) => {
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        const nextSizes = { ...cw.sizes };
+        Object.keys(nextSizes).forEach((s) => {
+          nextSizes[s] = { ...nextSizes[s], enabled: false };
+        });
+        return { ...cw, sizes: nextSizes };
+      })
+    );
+  };
+
+  const setAllStockForColorway = (colorwayId: string, stock: number) => {
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        const nextSizes = { ...cw.sizes };
+        Object.keys(nextSizes).forEach((s) => {
+          if (nextSizes[s]?.enabled) {
+            nextSizes[s] = { ...nextSizes[s], stock };
+          }
+        });
+        return { ...cw, sizes: nextSizes };
+      })
+    );
+  };
+
+  const addCustomSize = (colorwayId: string) => {
+    const sizeName = (newCustomSizeName[colorwayId] || '').trim().toUpperCase();
+    if (!sizeName) return;
+    setColorways((prev) =>
+      prev.map((cw) => {
+        if (cw.id !== colorwayId) return cw;
+        if (cw.customSizes.includes(sizeName) || SIZES.includes(sizeName)) {
+          showToast('Size already exists', 'danger');
+          return cw;
+        }
+        return {
+          ...cw,
+          customSizes: [...cw.customSizes, sizeName],
+          sizes: {
+            ...cw.sizes,
+            [sizeName]: { enabled: true, stock: 10 },
+          },
+        };
+      })
+    );
+    setNewCustomSizeName((prev) => ({ ...prev, [colorwayId]: '' }));
+  };
+
+  const linkImageToColorway = (colorwayId: string, targetImageIdx: number | null) => {
+    const cw = colorways.find((c) => c.id === colorwayId);
+    if (!cw) return;
+
+    if (targetImageIdx === null) {
+      setColorways((prev) =>
+        prev.map((c) => (c.id === colorwayId ? { ...c, imageIndex: null } : c))
+      );
+      if (cw.imageIndex !== null) {
+        setImages((prev) =>
+          prev.map((img, i) => (i === cw.imageIndex ? { ...img, colorHex: null } : img))
+        );
+      }
+      return;
+    }
+
+    setColorways((prev) =>
+      prev.map((c) => {
+        if (c.id === colorwayId) return { ...c, imageIndex: targetImageIdx };
+        if (c.imageIndex === targetImageIdx) return { ...c, imageIndex: null };
+        return c;
+      })
+    );
+
+    setImages((prev) =>
+      prev.map((img, i) => {
+        if (i === targetImageIdx) return { ...img, colorHex: cw.colorHex };
+        return img;
+      })
+    );
+    setColorImageEnabled(true);
+    showToast(`Linked photo #${targetImageIdx + 1} to ${cw.color}!`, 'success');
+  };
+
+  const handleImageColorHexChange = (idx: number, hex: string | null) => {
+    setImages((prev) => prev.map((m, i) => (i === idx ? { ...m, colorHex: hex } : m)));
+    if (hex) {
+      setColorways((prev) =>
+        prev.map((cw) =>
+          cw.colorHex.toLowerCase() === hex.toLowerCase()
+            ? { ...cw, imageIndex: idx }
+            : cw.imageIndex === idx
+              ? { ...cw, imageIndex: null }
+              : cw
+        )
+      );
+      setColorImageEnabled(true);
+    } else {
+      setColorways((prev) =>
+        prev.map((cw) => (cw.imageIndex === idx ? { ...cw, imageIndex: null } : cw))
+      );
+    }
+  };
+
+  // ── Variants helpers (Table View)
   const addVariant = () => {
-    const lastColor = variants[variants.length - 1];
-    setVariants((prev) => [
-      ...prev,
-      {
-        size: 'L',
-        color: lastColor?.color || 'Charcoal Black',
-        colorHex: lastColor?.colorHex || '#171718',
-        stock: 10,
-      },
-    ]);
+    const lastColor = colorways[colorways.length - 1];
+    const newVariant: VariantInput = {
+      size: 'L',
+      color: lastColor?.color || 'Charcoal Black',
+      colorHex: lastColor?.colorHex || '#171718',
+      stock: 10,
+    };
+    setVariants((prev) => [...prev, newVariant]);
   };
 
   const removeVariant = (index: number) => {
@@ -423,7 +847,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     setVariants((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      // If color name changes, try to sync colorHex from preset
       if (field === 'color') {
         const preset = PRESET_COLORS.find(
           (p) => p.name.toLowerCase() === String(value).toLowerCase()
@@ -454,6 +877,13 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
       return;
     }
 
+    const compiledVariants = viewMode === 'table' ? variants : compileVariants(colorways, sku);
+
+    if (compiledVariants.length === 0) {
+      showToast('Please enable at least one size variant with stock quantity', 'danger');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const payload = {
@@ -478,7 +908,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
           isPrimary: idx === 0,
           colorHex: colorImageEnabled ? img.colorHex : null,
         })),
-        variants: variants.map((v) => ({
+        variants: compiledVariants.map((v) => ({
           size: v.size,
           color: v.color,
           colorHex: v.colorHex || '#171718',
@@ -1035,16 +1465,12 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     key={idx}
                     image={img}
                     isPrimary={idx === 0}
-                    availableColors={colorImageEnabled ? availableColors : []}
+                    availableColors={colorways.length > 0 ? availableColors : []}
                     onRemove={() => removeImage(idx)}
                     onAltChange={(v) =>
                       setImages((prev) => prev.map((m, i) => (i === idx ? { ...m, alt: v } : m)))
                     }
-                    onColorHexChange={(v) =>
-                      setImages((prev) =>
-                        prev.map((m, i) => (i === idx ? { ...m, colorHex: v } : m))
-                      )
-                    }
+                    onColorHexChange={(v) => handleImageColorHexChange(idx, v)}
                     onUpload={(file) => uploadImage(file, idx)}
                     onUrlChange={(v) =>
                       setImages((prev) => prev.map((m, i) => (i === idx ? { ...m, url: v } : m)))
@@ -1054,126 +1480,553 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
               </div>
             )}
 
-            {colorImageEnabled && availableColors.length === 0 && (
+            {colorImageEnabled && colorways.length === 0 && (
               <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-400">
-                ⚠ Add variants with colors first to enable color → image mapping.
+                ⚠ Add colorways below to enable color → image mapping.
               </p>
             )}
           </section>
 
-          {/* Variants */}
-          <section className="rounded-xl border border-white/[0.06] bg-[#141416] p-6">
-            <div className="mb-4 flex items-center justify-between">
+          {/* ═══ COLORWAY & SIZE MATRIX (Image-Wise & Size-Wise Stock) ═══ */}
+          <section className="rounded-xl border border-white/[0.08] bg-[#141416] p-6 shadow-xl">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
               <div>
-                <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
-                  Garment Variants & Stock
-                </h2>
-                <p className="mt-0.5 text-[10px] text-zinc-600">
-                  Define sizes, colorways, and inventory quantities.
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/20 text-xs text-amber-400">
+                    <Palette className="h-3 w-3" />
+                  </span>
+                  <h2 className="text-[12px] font-black uppercase tracking-wider text-white">
+                    Colorway & Size Matrix (Stock by Color & Size)
+                  </h2>
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  Select available sizes & inventory for each photo/colorway. Customers will only
+                  see valid sizes for the color they choose.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addVariant}
-                className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-white/20 hover:text-white"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Variant
-              </button>
+
+              {/* View Switcher & Add Colorway */}
+              <div className="flex items-center gap-2">
+                <div className="flex overflow-hidden rounded-xl border border-white/[0.1] bg-[#1a1a1d] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('matrix')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
+                      viewMode === 'matrix'
+                        ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid className="h-3 w-3" /> Color Matrix
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
+                      viewMode === 'table'
+                        ? 'bg-zinc-700 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <TableIcon className="h-3 w-3" /> Table View
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addColorway}
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-300 transition-all hover:bg-amber-500/20"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Colorway
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-zinc-500">
-                    <th className="pb-2.5 pr-3 text-left font-bold">Size</th>
-                    <th className="pb-2.5 pr-3 text-left font-bold">Color Name</th>
-                    <th className="pb-2.5 pr-3 text-left font-bold">Color</th>
-                    <th className="pb-2.5 pr-3 text-left font-bold">Stock</th>
-                    <th className="pb-2.5 text-right font-bold">Del</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {variants.map((v, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2.5 pr-3">
-                        <select
-                          value={v.size}
-                          onChange={(e) => updateVariant(idx, 'size', e.target.value)}
-                          className="rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-zinc-500"
-                        >
-                          {SIZES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            list={`color-list-${idx}`}
-                            value={v.color}
-                            onChange={(e) => updateVariant(idx, 'color', e.target.value)}
-                            placeholder="e.g. Charcoal Black"
-                            className="w-36 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 outline-none focus:border-zinc-500"
-                          />
-                          <datalist id={`color-list-${idx}`}>
-                            {PRESET_COLORS.map((c) => (
-                              <option key={c.hex} value={c.name} />
-                            ))}
-                          </datalist>
+            {/* MATRIX VIEW */}
+            {viewMode === 'matrix' ? (
+              <div className="space-y-6">
+                {colorways.map((cw, cwIdx) => {
+                  const allSizesForCw = [...SIZES, ...cw.customSizes];
+                  const activeSizes = allSizesForCw.filter((s) => cw.sizes[s]?.enabled);
+                  const totalUnits = activeSizes.reduce(
+                    (sum, s) => sum + (Number(cw.sizes[s]?.stock) || 0),
+                    0
+                  );
+                  const linkedImg =
+                    cw.imageIndex !== null && images[cw.imageIndex]
+                      ? images[cw.imageIndex]
+                      : images.find(
+                          (img) =>
+                            img.colorHex && img.colorHex.toLowerCase() === cw.colorHex.toLowerCase()
+                        );
+
+                  return (
+                    <div
+                      key={cw.id}
+                      className="relative rounded-2xl border border-white/[0.08] bg-[#17171a] p-5 shadow-lg transition-all"
+                    >
+                      {/* Top Header of Colorway */}
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          {/* Color Swatch & Picker */}
+                          <div className="relative">
+                            <label className="relative block cursor-pointer">
+                              <span
+                                className="block h-9 w-9 rounded-xl border border-white/20 shadow-inner transition-transform hover:scale-105"
+                                style={{ backgroundColor: cw.colorHex || '#171718' }}
+                              />
+                              <input
+                                type="color"
+                                value={cw.colorHex || '#171718'}
+                                onChange={(e) =>
+                                  updateColorway(cw.id, { colorHex: e.target.value })
+                                }
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                title="Pick hex color"
+                              />
+                            </label>
+                          </div>
+
+                          {/* Color Name Input */}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                list={`preset-colors-${cw.id}`}
+                                value={cw.color}
+                                onChange={(e) => updateColorway(cw.id, { color: e.target.value })}
+                                placeholder="Color Name (e.g. Royal Blue)"
+                                className="rounded-lg border border-white/[0.1] bg-[#111113] px-3 py-1.5 text-xs font-bold text-white placeholder-zinc-600 outline-none focus:border-amber-500"
+                              />
+                              <datalist id={`preset-colors-${cw.id}`}>
+                                {PRESET_COLORS.map((c) => (
+                                  <option key={c.hex} value={c.name} />
+                                ))}
+                              </datalist>
+
+                              <input
+                                type="text"
+                                value={cw.colorHex}
+                                onChange={(e) =>
+                                  updateColorway(cw.id, { colorHex: e.target.value })
+                                }
+                                placeholder="#171718"
+                                maxLength={7}
+                                className="w-20 rounded-lg border border-white/[0.1] bg-[#111113] px-2 py-1.5 font-mono text-[11px] uppercase text-zinc-300 placeholder-zinc-600 outline-none focus:border-amber-500"
+                              />
+                            </div>
+                            <span className="mt-0.5 block text-[9px] text-zinc-500">
+                              Colorway #{cwIdx + 1}
+                            </span>
+                          </div>
                         </div>
-                      </td>
-                      <td className="py-2.5 pr-3">
+
+                        {/* Summary Badges & Actions */}
                         <div className="flex items-center gap-2">
-                          {/* Color preview swatch — click to pick */}
-                          <label className="relative cursor-pointer">
-                            <span
-                              className="block h-7 w-7 rounded-lg border border-white/20 shadow-inner"
-                              style={{ backgroundColor: v.colorHex || '#888' }}
-                            />
-                            <input
-                              type="color"
-                              value={v.colorHex || '#171718'}
-                              onChange={(e) => updateVariant(idx, 'colorHex', e.target.value)}
-                              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                              title="Pick color"
-                            />
-                          </label>
+                          <span className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold text-zinc-300">
+                            {activeSizes.length} sizes active • {totalUnits} pcs total
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => duplicateColorway(cw.id)}
+                            title="Duplicate this colorway with all size & stock quantities"
+                            className="flex h-8 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 text-[10px] font-semibold text-zinc-400 transition-colors hover:border-white/20 hover:text-white"
+                          >
+                            <Copy className="h-3 w-3" /> Duplicate
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => removeColorway(cw.id)}
+                            title="Delete this colorway"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/5 text-zinc-500 transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Photo / Image Association for this Color */}
+                      <div className="mb-5 rounded-xl border border-white/[0.06] bg-[#121214] p-3.5">
+                        <div className="mb-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ImageIcon className="h-3.5 w-3.5 text-amber-400" />
+                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-200">
+                              Linked Product Photo for {cw.color || 'this color'}
+                            </span>
+                            <span className="text-[9px] text-zinc-500">
+                              (Slides & displays when customer selects {cw.color})
+                            </span>
+                          </div>
+
+                          {linkedImg && (
+                            <button
+                              type="button"
+                              onClick={() => linkImageToColorway(cw.id, null)}
+                              className="text-[9px] text-zinc-500 hover:text-rose-400 hover:underline"
+                            >
+                              Unlink photo
+                            </button>
+                          )}
+                        </div>
+
+                        {images.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-white/[0.08] p-3 text-center text-[10px] text-zinc-500">
+                            Upload photos in the Media section above to link photos to this
+                            colorway.
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {images.map((img, imgIdx) => {
+                              const isLinkedToThis =
+                                cw.imageIndex === imgIdx ||
+                                (img.colorHex &&
+                                  img.colorHex.toLowerCase() === cw.colorHex.toLowerCase());
+                              const isLinkedToOther =
+                                !isLinkedToThis &&
+                                img.colorHex &&
+                                img.colorHex.toLowerCase() !== cw.colorHex.toLowerCase();
+                              const otherName = isLinkedToOther
+                                ? colorways.find(
+                                    (c) => c.colorHex.toLowerCase() === img.colorHex?.toLowerCase()
+                                  )?.color || img.colorHex
+                                : null;
+
+                              return (
+                                <button
+                                  key={imgIdx}
+                                  type="button"
+                                  onClick={() =>
+                                    linkImageToColorway(cw.id, isLinkedToThis ? null : imgIdx)
+                                  }
+                                  className={`group flex items-center gap-2 rounded-xl border p-1.5 transition-all ${
+                                    isLinkedToThis
+                                      ? 'border-amber-500 bg-amber-500/10 text-white ring-1 ring-amber-500/50'
+                                      : 'border-white/[0.08] bg-[#1a1a1d] text-zinc-400 hover:border-white/20 hover:text-white'
+                                  }`}
+                                >
+                                  <div className="relative h-11 w-9 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+                                    {img.url ? (
+                                      <Image
+                                        src={img.url}
+                                        alt={img.alt || `img-${imgIdx}`}
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    ) : (
+                                      <ImageIcon className="m-auto h-4 w-4 text-zinc-600" />
+                                    )}
+                                  </div>
+                                  <div className="pr-1.5 text-left">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-bold text-white">
+                                        {imgIdx === 0 ? 'Main Photo' : `Photo #${imgIdx + 1}`}
+                                      </span>
+                                      {isLinkedToThis && (
+                                        <span className="py-0.2 rounded bg-amber-500 px-1 text-[8px] font-black text-black">
+                                          ✓ ACTIVE
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="block text-[8px] text-zinc-500">
+                                      {isLinkedToThis
+                                        ? `Assigned to ${cw.color}`
+                                        : isLinkedToOther
+                                          ? `Linked to ${otherName}`
+                                          : 'Click to assign'}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sizes & Stock Quantity Matrix */}
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-300">
+                              Available Sizes & Stock Quantity
+                            </span>
+                            <p className="text-[9px] text-zinc-500">
+                              Toggle sizes ON to make them available for {cw.color}. Enter stock for
+                              each size.
+                            </p>
+                          </div>
+
+                          {/* Quick preset actions */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => enableSizesPreset(cw.id, ['S', 'M', 'L', 'XL'])}
+                              className="rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[9px] font-bold text-zinc-400 hover:border-zinc-500 hover:text-white"
+                            >
+                              S — XL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => enableSizesPreset(cw.id, SIZES)}
+                              className="rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[9px] font-bold text-zinc-400 hover:border-zinc-500 hover:text-white"
+                            >
+                              All Sizes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAllStockForColorway(cw.id, 10)}
+                              className="rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[9px] font-bold text-zinc-400 hover:border-zinc-500 hover:text-white"
+                            >
+                              Set 10 pcs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAllStockForColorway(cw.id, 25)}
+                              className="rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[9px] font-bold text-zinc-400 hover:border-zinc-500 hover:text-white"
+                            >
+                              Set 25 pcs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => disableAllSizesForColorway(cw.id)}
+                              className="rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[9px] font-bold text-zinc-500 hover:border-rose-500/50 hover:text-rose-400"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Size Cards Grid */}
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                          {allSizesForCw.map((size) => {
+                            const sData = cw.sizes[size] || { enabled: false, stock: 10 };
+                            return (
+                              <div
+                                key={size}
+                                className={`flex flex-col justify-between rounded-xl border p-2.5 transition-all ${
+                                  sData.enabled
+                                    ? 'border-amber-500/50 bg-amber-500/[0.05] shadow-sm'
+                                    : 'border-white/[0.06] bg-[#121214] opacity-50 hover:opacity-80'
+                                }`}
+                              >
+                                {/* Header: Size label + toggle button */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSize(cw.id, size)}
+                                  className="flex items-center justify-between gap-1 pb-2"
+                                >
+                                  <span
+                                    className={`text-sm font-black tracking-wider ${
+                                      sData.enabled ? 'text-amber-400' : 'text-zinc-500'
+                                    }`}
+                                  >
+                                    {size}
+                                  </span>
+                                  <span
+                                    className={`rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase ${
+                                      sData.enabled
+                                        ? 'bg-amber-500/20 text-amber-300'
+                                        : 'bg-zinc-800 text-zinc-500'
+                                    }`}
+                                  >
+                                    {sData.enabled ? '✓ ON' : 'OFF'}
+                                  </span>
+                                </button>
+
+                                {/* Body: Quantity input */}
+                                {sData.enabled ? (
+                                  <div className="border-t border-white/[0.06] pt-1.5">
+                                    <label className="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-zinc-500">
+                                      Stock (Pcs)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={sData.stock}
+                                      onChange={(e) =>
+                                        updateSizeStock(
+                                          cw.id,
+                                          size,
+                                          Math.max(0, Number(e.target.value))
+                                        )
+                                      }
+                                      className={`w-full rounded-lg border bg-[#111113] px-2 py-1 text-center font-mono text-xs font-bold outline-none transition-colors ${
+                                        sData.stock === 0
+                                          ? 'border-rose-500/50 text-rose-400 focus:border-rose-500'
+                                          : 'border-white/[0.1] text-white focus:border-amber-500'
+                                      }`}
+                                      placeholder="Qty"
+                                    />
+                                    <span className="mt-0.5 block text-center text-[7px] text-zinc-500">
+                                      {sData.stock === 0
+                                        ? 'Out of stock'
+                                        : `${sData.stock} in stock`}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSize(cw.id, size)}
+                                    className="mt-1 w-full rounded-lg border border-dashed border-white/[0.08] py-1 text-center text-[8px] font-semibold text-zinc-500 transition-colors hover:border-zinc-500 hover:text-zinc-300"
+                                  >
+                                    + Enable
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Add Custom Size inline */}
+                        <div className="flex items-center gap-2 pt-1">
                           <input
                             type="text"
-                            value={v.colorHex || ''}
-                            onChange={(e) => updateVariant(idx, 'colorHex', e.target.value)}
-                            placeholder="#171718"
-                            maxLength={7}
-                            className="w-20 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2 py-1.5 font-mono text-[11px] uppercase text-white placeholder-zinc-600 outline-none focus:border-zinc-500"
+                            value={newCustomSizeName[cw.id] || ''}
+                            onChange={(e) =>
+                              setNewCustomSizeName((prev) => ({
+                                ...prev,
+                                [cw.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Add custom size (e.g. 32, 34, One Size)..."
+                            className="w-56 rounded-lg border border-white/[0.08] bg-[#111113] px-2.5 py-1 text-[11px] text-white placeholder-zinc-600 outline-none focus:border-amber-500"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addCustomSize(cw.id);
+                              }
+                            }}
                           />
+                          <button
+                            type="button"
+                            onClick={() => addCustomSize(cw.id)}
+                            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold text-zinc-300 hover:border-white/20 hover:text-white"
+                          >
+                            + Add Size
+                          </button>
                         </div>
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        <input
-                          type="number"
-                          min={0}
-                          value={v.stock}
-                          onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
-                          className="w-20 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-zinc-500"
-                        />
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeVariant(idx)}
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add Another Colorway card */}
+                <button
+                  type="button"
+                  onClick={addColorway}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.1] bg-white/[0.01] py-5 text-xs font-bold text-zinc-400 transition-all hover:border-amber-500/50 hover:bg-amber-500/[0.02] hover:text-amber-300"
+                >
+                  <Plus className="h-4 w-4" /> Add Another Colorway (Image & Sizes)
+                </button>
+              </div>
+            ) : (
+              /* RAW TABLE VIEW */
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-white/20 hover:text-white"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Row
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-zinc-500">
+                        <th className="pb-2.5 pr-3 text-left font-bold">Size</th>
+                        <th className="pb-2.5 pr-3 text-left font-bold">Color Name</th>
+                        <th className="pb-2.5 pr-3 text-left font-bold">Color</th>
+                        <th className="pb-2.5 pr-3 text-left font-bold">Stock</th>
+                        <th className="pb-2.5 pr-3 text-left font-bold">SKU</th>
+                        <th className="pb-2.5 text-right font-bold">Del</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.04]">
+                      {variants.map((v, idx) => (
+                        <tr key={idx}>
+                          <td className="py-2.5 pr-3">
+                            <select
+                              value={v.size}
+                              onChange={(e) => updateVariant(idx, 'size', e.target.value)}
+                              className="rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-zinc-500"
+                            >
+                              {SIZES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <input
+                              type="text"
+                              value={v.color}
+                              onChange={(e) => updateVariant(idx, 'color', e.target.value)}
+                              placeholder="e.g. Charcoal Black"
+                              className="w-36 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 outline-none focus:border-zinc-500"
+                            />
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <div className="flex items-center gap-2">
+                              <label className="relative cursor-pointer">
+                                <span
+                                  className="block h-7 w-7 rounded-lg border border-white/20 shadow-inner"
+                                  style={{ backgroundColor: v.colorHex || '#888' }}
+                                />
+                                <input
+                                  type="color"
+                                  value={v.colorHex || '#171718'}
+                                  onChange={(e) => updateVariant(idx, 'colorHex', e.target.value)}
+                                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                />
+                              </label>
+                              <input
+                                type="text"
+                                value={v.colorHex || ''}
+                                onChange={(e) => updateVariant(idx, 'colorHex', e.target.value)}
+                                placeholder="#171718"
+                                maxLength={7}
+                                className="w-20 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2 py-1.5 font-mono text-[11px] uppercase text-white placeholder-zinc-600 outline-none focus:border-zinc-500"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <input
+                              type="number"
+                              min={0}
+                              value={v.stock}
+                              onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
+                              className="w-20 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-zinc-500"
+                            />
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <input
+                              type="text"
+                              value={v.sku || ''}
+                              onChange={(e) => updateVariant(idx, 'sku', e.target.value)}
+                              placeholder="Auto SKU"
+                              className="w-32 rounded-lg border border-white/[0.08] bg-[#1a1a1d] px-2.5 py-1.5 font-mono text-[11px] text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-500"
+                            />
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(idx)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
         </div>
 
@@ -1267,28 +2120,54 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
           )}
 
           {/* Color summary */}
-          {availableColors.length > 0 && (
+          {colorways.length > 0 && (
             <section className="rounded-xl border border-white/[0.06] bg-[#141416] p-5">
               <h2 className="mb-3 text-[11px] font-black uppercase tracking-wider text-zinc-400">
-                Available Colors
+                Configured Colorways ({colorways.length})
               </h2>
-              <div className="flex flex-wrap gap-2">
-                {availableColors.map((c) => (
-                  <div
-                    key={c.hex}
-                    className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5"
-                  >
-                    <span
-                      className="h-3 w-3 rounded-full border border-white/20"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <span className="text-[11px] font-semibold text-zinc-300">{c.name}</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {colorways.map((cw) => {
+                  const activeSizes = Object.entries(cw.sizes)
+                    .filter(([_, d]) => d.enabled)
+                    .map(([s]) => s);
+                  const totalStock = Object.entries(cw.sizes)
+                    .filter(([_, d]) => d.enabled)
+                    .reduce((sum, [_, d]) => sum + (Number(d.stock) || 0), 0);
+                  const hasPhoto = cw.imageIndex !== null && images[cw.imageIndex]?.url;
+
+                  return (
+                    <div
+                      key={cw.id}
+                      className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-2.5"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full border border-white/20 shadow-sm"
+                          style={{ backgroundColor: cw.colorHex }}
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-zinc-200">{cw.color}</span>
+                          <span className="block text-[9px] text-zinc-500">
+                            {activeSizes.length > 0
+                              ? `Sizes: ${activeSizes.join(', ')} (${totalStock} pcs)`
+                              : 'No sizes active'}
+                          </span>
+                        </div>
+                      </div>
+                      {hasPhoto ? (
+                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-bold text-emerald-400">
+                          Photo Linked
+                        </span>
+                      ) : (
+                        <span className="text-[8px] text-zinc-500">No Photo</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               {colorImageEnabled && (
-                <p className="mt-2 text-[10px] text-indigo-400">
-                  ✓ Color → Image mapping is active
+                <p className="mt-3 flex items-center gap-1 text-[10px] text-emerald-400">
+                  <Check className="h-3 w-3" /> Color → Image slide synchronization active
                 </p>
               )}
             </section>

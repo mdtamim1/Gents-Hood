@@ -57,7 +57,7 @@ export default async function HomePage() {
     ].filter(Boolean),
     contactPoint: {
       '@type': 'ContactPoint',
-      telephone: siteSettings?.contactPhone || '+880 1700-000000',
+      telephone: siteSettings?.contactPhone || '+880 1623-095187',
       contactType: 'Customer Support',
       areaServed: 'BD',
       availableLanguage: ['English', 'Bengali'],
@@ -78,7 +78,7 @@ export default async function HomePage() {
           (item: { id?: string; title?: string; image?: string }, idx: number) => ({
             id: item.id || String(idx + 1),
             title: item.title || `Preview ${idx + 1}`,
-            image: item.image || '/images/gallery-front.jpg',
+            image: item.image || '/images/logo.png',
             alt: item.title,
           })
         );

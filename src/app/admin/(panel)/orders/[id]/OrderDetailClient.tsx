@@ -137,7 +137,7 @@ export function OrderDetailClient({ initialOrder }: { initialOrder: OrderDetail 
       {/* Printable Invoice Header (visible only when printing) */}
       <div className="mb-6 hidden border-b border-line pb-4 print:block">
         <h1 className="text-2xl font-bold tracking-tight">GENTS HOOD ATELIER</h1>
-        <p className="text-xs text-muted">Gulshan 2, Dhaka, Bangladesh · Official Packing Slip</p>
+        <p className="text-xs text-muted">Faridpur, Dhaka, Bangladesh · Official Packing Slip</p>
         <p className="mt-2 text-sm font-bold">Order: {order.orderNo}</p>
       </div>
 

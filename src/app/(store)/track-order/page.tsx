@@ -285,7 +285,7 @@ function TrackOrderContent() {
                     <div className="flex items-center gap-3">
                       <div className="relative h-14 w-12 flex-shrink-0 overflow-hidden border border-line bg-cream">
                         <Image
-                          src={item.image || '/images/gallery-front.jpg'}
+                          src={item.image || '/images/logo.png'}
                           alt={item.name}
                           fill
                           sizes="48px"

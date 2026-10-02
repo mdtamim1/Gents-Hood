@@ -18,9 +18,12 @@ interface QuickSizeModalProps {
   onClose: () => void;
 }
 
+const STANDARD_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
 export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps) {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
+  const setDirectBuyItem = useCartStore((state) => state.setDirectBuyItem);
   const setIsCartOpen = useCartStore((state) => state.setIsOpen);
   const { showToast } = useToast();
 
@@ -46,28 +49,39 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
     return Array.from(map.entries()).map(([name, hex]) => ({ name, hex }));
   }, [product]);
 
-  // Extract unique sizes
+  // Extract unique sizes sorted in standard garment order
   const sizes = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
       return ['S', 'M', 'L', 'XL'];
     }
     const set = new Set<string>();
     product.variants.forEach((v) => set.add(v.size));
-    return Array.from(set);
+    return Array.from(set).sort((a, b) => {
+      const idxA = STANDARD_SIZE_ORDER.indexOf(a);
+      const idxB = STANDARD_SIZE_ORDER.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
   }, [product]);
 
   const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name || '');
-  const [selectedSize, setSelectedSize] = useState<string>(sizes[0] || 'M');
+  const [selectedSize, setSelectedSize] = useState<string>('');
 
   // Reset state whenever modal opens for a new product
   useEffect(() => {
     if (isOpen) {
-      setSelectedColor(colors[0]?.name || '');
-      setSelectedSize(sizes[0] || 'M');
+      const initColor = colors[0]?.name || '';
+      setSelectedColor(initColor);
+      const availVariant = (product.variants || []).find(
+        (v) => v.color.toLowerCase() === initColor.toLowerCase() && v.stock > 0
+      );
+      setSelectedSize(availVariant ? availVariant.size : sizes[0] || 'M');
       setQuantity(1);
       setIsAdded(false);
     }
-  }, [isOpen, colors, sizes]);
+  }, [isOpen, colors, sizes, product.variants]);
 
   // Escape key handler & lock scroll
   const handleKeyDown = useCallback(
@@ -98,7 +112,7 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
   }, [product, selectedColor, selectedSize]);
 
   const stockRemaining = activeVariant ? activeVariant.stock : 10;
-  const primaryImage = product.images[0]?.url || '/images/gallery-front.jpg';
+  const primaryImage = product.images[0]?.url || '/images/logo.png';
 
   const discountPercent = product.comparePrice
     ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
@@ -144,7 +158,8 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
       return;
     }
 
-    addItem({
+    // Direct buy item isolated from cart
+    setDirectBuyItem({
       productId: product.id,
       variantId: activeVariant?.id,
       name: product.name,
@@ -163,7 +178,7 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
 
     setIsCartOpen(false);
     onClose();
-    router.push('/checkout');
+    router.push('/checkout?direct=true');
   };
 
   if (!isOpen || !mounted) return null;
@@ -274,8 +289,12 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
               {sizes.map((size) => {
                 const isSelected = selectedSize === size;
-                const variantForSize = product.variants?.find((v) => v.size === size);
-                const isOutOfStock = variantForSize ? variantForSize.stock <= 0 : false;
+                const variantForSize = product.variants?.find(
+                  (v) =>
+                    v.color.toLowerCase() === selectedColor.toLowerCase() &&
+                    v.size.toLowerCase() === size.toLowerCase()
+                );
+                const isOutOfStock = !variantForSize || variantForSize.stock <= 0;
 
                 return (
                   <button
@@ -314,7 +333,19 @@ export function QuickSizeModal({ product, isOpen, onClose }: QuickSizeModalProps
                     <button
                       key={color.name}
                       type="button"
-                      onClick={() => setSelectedColor(color.name)}
+                      onClick={() => {
+                        setSelectedColor(color.name);
+                        const colorVariants = (product.variants || []).filter(
+                          (v) => v.color.toLowerCase() === color.name.toLowerCase()
+                        );
+                        const hasCurrent = colorVariants.some(
+                          (v) => v.size.toLowerCase() === selectedSize.toLowerCase() && v.stock > 0
+                        );
+                        if (!hasCurrent) {
+                          const firstAvail = colorVariants.find((v) => v.stock > 0);
+                          setSelectedSize(firstAvail ? firstAvail.size : '');
+                        }
+                      }}
                       className={`flex items-center gap-2 rounded-[2px] border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all ${
                         isColorSelected
                           ? 'border-[#4A0E17] bg-[#4A0E17]/10 font-bold text-[#4A0E17]'
