@@ -142,6 +142,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${interTight.variable} ${cinzel.variable} ${playfair.variable}`}>
       <body className="font-sans antialiased">
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-WNQLRP52"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         <MetaPixel />
         {children}
       </body>
