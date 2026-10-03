@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redis } from './redis';
 import { autoNotifySearchEngines } from '@/lib/services/indexing.service';
 
@@ -11,6 +11,11 @@ const memoryStore = new Map<string, CacheEntry<unknown>>();
 const KEY_PREFIX = 'gh:cache:';
 // Max L1 entries to prevent memory bloat in serverless environments
 const MAX_MEMORY_ENTRIES = 100;
+// L1 in-memory micro-cache TTL (3 seconds).
+// In serverless and multi-container environments, keeping L1 TTL short (3s) ensures that updates
+// from another instance (e.g. Admin API) propagate within seconds, while still shielding Redis and DB
+// from concurrent burst traffic (thundering herd).
+const MAX_L1_TTL_MS = 3000;
 
 /**
  * Multi-tier cache helper:
@@ -39,9 +44,10 @@ export async function getOrSetCache<T>(
     try {
       const redisCached = await redis.get<T>(redisKey);
       if (redisCached !== null && redisCached !== undefined) {
+        const l1TtlMs = Math.min(ttlSeconds * 1000, MAX_L1_TTL_MS);
         memoryStore.set(key, {
           value: redisCached,
-          expiresAt: now + ttlSeconds * 1000,
+          expiresAt: now + l1TtlMs,
         });
         return redisCached;
       }
@@ -58,9 +64,10 @@ export async function getOrSetCache<T>(
     const oldestKey = memoryStore.keys().next().value;
     if (oldestKey) memoryStore.delete(oldestKey);
   }
+  const l1TtlMs = Math.min(ttlSeconds * 1000, MAX_L1_TTL_MS);
   memoryStore.set(key, {
     value: freshValue,
-    expiresAt: now + ttlSeconds * 1000,
+    expiresAt: now + l1TtlMs,
   });
 
   // Populate L2 Redis
@@ -131,6 +138,20 @@ export async function invalidateAllProductCaches(slug?: string): Promise<void> {
  */
 export function revalidateStorefront(slug?: string): void {
   try {
+    // 1. Tag-based global on-demand revalidation (works across subdomains and multi-domain edge caches)
+    try {
+      revalidateTag('site_settings');
+      revalidateTag('products');
+      revalidateTag('featured_product');
+      revalidateTag('trending_products');
+      if (slug) {
+        revalidateTag(`product_${slug}`);
+      }
+    } catch (tagErr) {
+      console.warn('[Cache] revalidateTag warning:', tagErr);
+    }
+
+    // 2. Path-based on-demand revalidation for all storefront routes
     revalidatePath('/', 'page');
     revalidatePath('/', 'layout');
     revalidatePath('/trending', 'page');
@@ -146,6 +167,6 @@ export function revalidateStorefront(slug?: string): void {
     }
     autoNotifySearchEngines(pathsToNotify);
   } catch (err) {
-    console.warn('[Cache] revalidatePath error:', err);
+    console.warn('[Cache] revalidateStorefront error:', err);
   }
 }

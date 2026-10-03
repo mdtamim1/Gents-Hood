@@ -54,6 +54,11 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react'],
     // Faster page transitions with scroll position restoration
     scrollRestoration: true,
+    // Reduce client-side router cache time so users and admin see updates immediately
+    staleTimes: {
+      dynamic: 0,
+      static: 0,
+    },
   },
   images: {
     formats: ['image/avif', 'image/webp'],
