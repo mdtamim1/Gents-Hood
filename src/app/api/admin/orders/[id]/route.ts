@@ -50,7 +50,11 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     const auth = await verifyAdminAccess('orders');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -84,7 +88,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const auth = await verifyAdminAccess('orders');
     if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized' },
+        {
+          success: false,
+          error:
+            auth.reason === 'forbidden' ? 'Forbidden: Orders permission required' : 'Unauthorized',
+        },
         { status: auth.reason === 'forbidden' ? 403 : 401 }
       );
     }
@@ -105,6 +113,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     });
     if (!order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
+    }
+
+    // Task 2: RETURNED orders are permanently locked — cannot change status
+    if (order.status === 'RETURNED' && result.data.status && result.data.status !== 'RETURNED') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'This order has been returned and is permanently locked. Status cannot be changed.',
+        },
+        { status: 403 }
+      );
     }
 
     const { status, activityNote, assignedToId, items, ...restUpdate } = result.data;
@@ -164,7 +184,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         });
         if (!activeSession) {
           return NextResponse.json(
-            { success: false, error: 'Cannot assign to offline staff. The staff member must be online.' },
+            {
+              success: false,
+              error: 'Cannot assign to offline staff. The staff member must be online.',
+            },
             { status: 400 }
           );
         }

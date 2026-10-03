@@ -22,9 +22,14 @@ export default async function AdminOrdersPage() {
   // Admin sees all orders.
   const whereClause = currentRole !== 'OWNER' ? { assignedToId: session.id } : {};
 
-  const [orders, counts, staffList, user] = await Promise.all([
+  // TASK 4: Only show orders that have been synced (syncedAt != null) OR manually created
+  const syncedFilter = {
+    OR: [{ syncedAt: { not: null } }, { isManualOrder: true }],
+  };
+
+  const [orders, counts, staffList, user, unsyncedCount] = await Promise.all([
     db.order.findMany({
-      where: whereClause,
+      where: { ...whereClause, ...syncedFilter },
       include: {
         items: true,
         statusHistory: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -36,7 +41,7 @@ export default async function AdminOrdersPage() {
       orderBy: { createdAt: 'desc' },
       take: 300,
     }),
-    // Status counts
+    // Status counts (only synced/manual)
     (async () => {
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -44,11 +49,12 @@ export default async function AdminOrdersPage() {
         db.order.groupBy({
           by: ['status'],
           _count: { status: true },
-          where: whereClause,
+          where: { ...whereClause, ...syncedFilter },
         }),
         db.order.count({
           where: {
             ...whereClause,
+            ...syncedFilter,
             createdAt: { gte: startOfToday },
           },
         }),
@@ -90,6 +96,10 @@ export default async function AdminOrdersPage() {
       where: { id: session.id },
       select: { name: true, role: true, displayColor: true },
     }),
+    // Count customer orders waiting to be synced
+    db.order.count({
+      where: { syncedAt: null, isManualOrder: false },
+    }),
   ]);
 
   const sessionData = {
@@ -104,6 +114,7 @@ export default async function AdminOrdersPage() {
       initialCounts={counts}
       session={sessionData}
       staffList={staffList}
+      initialUnsyncedCount={unsyncedCount}
     />
   );
 }

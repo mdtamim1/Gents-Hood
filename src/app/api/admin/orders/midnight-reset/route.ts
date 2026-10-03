@@ -8,6 +8,11 @@ export const dynamic = 'force-dynamic';
  * Handled at midnight (12:00 AM) to perform automatic maintenance:
  * - Cleans up old staff sessions older than 30 days
  * - Keeps database lightweight and performant
+ *
+ * TASK 3: NOTE — This cron INTENTIONALLY does NOT reset or modify any orders.
+ * PENDING orders persist indefinitely until admin manually syncs or changes them.
+ * Never add order-clearing logic here.
+ *
  * Vercel Cron triggers this via HTTP GET
  */
 async function handleMidnightReset(request: NextRequest) {

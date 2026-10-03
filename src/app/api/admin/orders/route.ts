@@ -25,7 +25,13 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'ALL';
     const dateFilter = searchParams.get('date') || 'ALL'; // TODAY, ALL
 
-    const whereClause: Record<string, unknown> = {};
+    // TASK 4: Only show orders that have been synced (syncedAt != null) OR manually created
+    // Customer web orders without syncedAt are hidden until admin clicks "Order Sync"
+    const baseFilter = {
+      OR: [{ syncedAt: { not: null } }, { isManualOrder: true }],
+    };
+
+    const whereClause: Record<string, unknown> = { ...baseFilter };
 
     // Status filter
     if (status !== 'ALL') {
@@ -47,14 +53,22 @@ export async function GET(request: NextRequest) {
       whereClause.assignedToId = session.id;
     }
 
-    // Search across entire store for orders
+    // Search across entire store for orders (still only synced/manual)
     if (search) {
-      whereClause.OR = [
-        { orderNo: { contains: search } },
-        { shippingPhone: { contains: search } },
-        { shippingName: { contains: search } },
-        { shippingDistrict: { contains: search } },
+      // Merge OR conditions: must be synced AND match search
+      whereClause.AND = [
+        { OR: [{ syncedAt: { not: null } }, { isManualOrder: true }] },
+        {
+          OR: [
+            { orderNo: { contains: search } },
+            { shippingPhone: { contains: search } },
+            { shippingName: { contains: search } },
+            { shippingDistrict: { contains: search } },
+          ],
+        },
       ];
+      // Remove the top-level OR so it doesn't conflict
+      delete whereClause.OR;
     }
 
     const orders = await db.order.findMany({
@@ -81,21 +95,29 @@ export async function GET(request: NextRequest) {
       take: 200,
     });
 
-    // Count by status for dashboard tabs
+    // Count by status for dashboard tabs (only synced/manual orders)
+    const syncedFilter = { OR: [{ syncedAt: { not: null } }, { isManualOrder: true }] };
     const statusCounts = await db.order.groupBy({
       by: ['status'],
       _count: { status: true },
-      where: session.role !== 'OWNER' ? { assignedToId: session.id } : undefined,
+      where:
+        session.role !== 'OWNER' ? { assignedToId: session.id, ...syncedFilter } : syncedFilter,
     });
 
-    // Today's count
+    // Today's count (only synced/manual orders)
     const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const todayCount = await db.order.count({
       where: {
         createdAt: { gte: startOfToday },
         ...(session.role !== 'OWNER' ? { assignedToId: session.id } : {}),
+        ...syncedFilter,
       },
+    });
+
+    // Count unsynced web orders (pending in queue) for Sync button badge
+    const unsyncedCount = await db.order.count({
+      where: { syncedAt: null, isManualOrder: false },
     });
 
     // Fetch live staff online status if OWNER
@@ -134,6 +156,7 @@ export async function GET(request: NextRequest) {
         byStatus: Object.fromEntries(statusCounts.map((s) => [s.status, s._count.status])),
       },
       staffList,
+      unsyncedCount,
     });
   } catch (error: unknown) {
     console.error('Failed to list orders:', error);

@@ -227,11 +227,13 @@ export default function OrdersPageClient({
   initialCounts,
   session,
   staffList: initialStaffList,
+  initialUnsyncedCount = 0,
 }: {
   initialOrders: Order[];
   initialCounts: Counts;
   session: { id: string; name: string; role: string };
   staffList: StaffMember[];
+  initialUnsyncedCount?: number;
 }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [counts, setCounts] = useState<Counts>(initialCounts);
@@ -239,6 +241,7 @@ export default function OrdersPageClient({
   const onlineStaffList = useMemo(() => staffList.filter((s) => s.isOnline), [staffList]);
   const [activeTab, setActiveTab] = useState<Tab>('processing');
   const [search, setSearch] = useState('');
+  const [unsyncedCount, setUnsyncedCount] = useState(initialUnsyncedCount);
   const [appealOrder, setAppealOrder] = useState<Order | null>(null);
   const [appealSuccessMsg, setAppealSuccessMsg] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -330,6 +333,9 @@ export default function OrdersPageClient({
           setCounts(data.counts);
           if (data.staffList) {
             setStaffList(data.staffList);
+          }
+          if (typeof data.unsyncedCount === 'number') {
+            setUnsyncedCount(data.unsyncedCount);
           }
         }
       } catch (e) {
@@ -600,6 +606,11 @@ export default function OrdersPageClient({
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
               <span>Order Sync</span>
+              {unsyncedCount > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 font-mono text-[10px] font-bold text-zinc-900">
+                  {unsyncedCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -658,6 +669,26 @@ export default function OrdersPageClient({
         <div className="flex items-center gap-2 rounded-lg border border-blue-500/25 bg-blue-500/10 px-4 py-3 text-xs font-medium text-blue-300">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{syncResult}</span>
+        </div>
+      )}
+
+      {/* Task 4: Queue Info Banner — customer orders waiting for sync */}
+      {isOwner && unsyncedCount > 0 && !syncResult && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+              <Clock className="h-3.5 w-3.5 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-300">
+                {unsyncedCount} customer order{unsyncedCount > 1 ? 's' : ''} waiting in queue
+              </p>
+              <p className="mt-0.5 text-[11px] text-amber-400/70">
+                Click &quot;Order Sync&quot; to distribute {unsyncedCount > 1 ? 'them' : 'it'} to
+                staff and move to Processing.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -741,13 +772,17 @@ export default function OrdersPageClient({
               type="text"
               placeholder="Search order ID, customer, phone..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+              }}
               className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-8 text-xs text-white placeholder-zinc-500 outline-none transition-colors focus:border-zinc-500"
             />
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch('')}
+                onClick={() => {
+                  setSearch('');
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
                 title="Clear search"
               >
@@ -977,7 +1012,23 @@ export default function OrdersPageClient({
 
             {/* Table Body */}
             <tbody className="divide-y divide-white/[0.04]">
-              {filteredOrders.length === 0 ? (
+              {/* Task 1: When 'all' tab is active and search is empty, prompt user to search */}
+              {activeTab === 'all' && !search.trim() ? (
+                <tr>
+                  <td colSpan={9} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                        <Search className="h-7 w-7 text-zinc-600" />
+                      </div>
+                      <p className="text-sm font-semibold text-zinc-300">Search Orders</p>
+                      <p className="max-w-xs text-xs text-zinc-500">
+                        Type an order ID, customer name, or phone number in the search box above to
+                        find orders across your entire store.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
