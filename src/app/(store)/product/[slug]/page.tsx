@@ -7,7 +7,8 @@ import { ProductDetails } from '@/components/product/ProductDetails';
 import { ProductCard } from '@/components/product/ProductCard';
 import { getSiteUrl } from '@/lib/constants/site';
 
-export const revalidate = 30;
+// ISR: revalidate every 10 seconds (on-demand via revalidateTag is instant)
+export const revalidate = 10;
 
 interface ProductPageProps {
   params: {

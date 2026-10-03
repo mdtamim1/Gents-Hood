@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { redis } from './redis';
 import { autoNotifySearchEngines } from '@/lib/services/indexing.service';
 
@@ -134,7 +134,57 @@ export async function invalidateAllProductCaches(slug?: string): Promise<void> {
 }
 
 /**
- * Trigger Next.js On-Demand Revalidation for storefront routes
+ * Cross-Domain HTTP revalidation call.
+ *
+ * WHY THIS IS NEEDED:
+ * Admin runs on admin.gentshood.com — a separate Vercel deployment (or same deployment
+ * but different origin). Next.js revalidatePath() and revalidateTag() only work within
+ * the CURRENT serverless function's cache namespace. Calling them from admin.gentshood.com
+ * has ZERO effect on gentshood.com's cache.
+ *
+ * This function makes an HTTP POST to gentshood.com/api/revalidate, which runs inside
+ * the main domain's serverless environment and can properly purge its own cache.
+ */
+async function triggerCrossDomainRevalidation(slug?: string): Promise<void> {
+  try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+    const secret = process.env.REVALIDATE_SECRET || process.env.CRON_SECRET;
+
+    // Only trigger if we have a real production URL and secret
+    if (!siteUrl || !secret || siteUrl.includes('localhost')) return;
+
+    // Normalize: strip trailing slash, ensure https
+    const baseUrl = siteUrl.replace(/\/$/, '');
+    const revalidateUrl = `${baseUrl}/api/revalidate`;
+
+    const response = await fetch(revalidateUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-revalidate-secret': secret,
+      },
+      body: JSON.stringify({ slug: slug || null }),
+      // Short timeout — don't let this block the admin API response
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `[Cache] Cross-domain revalidation failed: ${response.status} ${response.statusText}`
+      );
+    }
+  } catch (err) {
+    // Non-blocking — log and continue
+    console.warn('[Cache] Cross-domain revalidation error (non-fatal):', err);
+  }
+}
+
+/**
+ * Trigger Next.js On-Demand Revalidation for storefront routes.
+ *
+ * This function fires BOTH:
+ * 1. Local revalidatePath/revalidateTag (works when admin and store are same deployment)
+ * 2. Cross-domain HTTP call to /api/revalidate (works when admin is on a subdomain)
  */
 export function revalidateStorefront(slug?: string): void {
   try {
@@ -160,6 +210,10 @@ export function revalidateStorefront(slug?: string): void {
       revalidatePath(`/product/${slug}`, 'page');
     }
 
+    // 3. Cross-domain HTTP revalidation (admin.gentshood.com → gentshood.com)
+    // Fire-and-forget — does not block the admin API response
+    triggerCrossDomainRevalidation(slug).catch(() => {});
+
     // Automatically broadcast updated pages to Google & IndexNow search engines
     const pathsToNotify = ['/', '/trending', '/sitemap.xml'];
     if (slug) {
@@ -169,4 +223,20 @@ export function revalidateStorefront(slug?: string): void {
   } catch (err) {
     console.warn('[Cache] revalidateStorefront error:', err);
   }
+}
+
+/**
+ * unstable_cache wrapper with proper Next.js tags for revalidateTag() to work.
+ * Use this for any data that needs instant cache busting via revalidateTag.
+ */
+export function makeTaggedCache<T>(
+  fn: (...args: unknown[]) => Promise<T>,
+  keyParts: string[],
+  tags: string[],
+  revalidateSeconds = 30
+) {
+  return unstable_cache(fn, keyParts, {
+    tags,
+    revalidate: revalidateSeconds,
+  });
 }

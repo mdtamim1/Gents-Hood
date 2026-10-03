@@ -1,8 +1,13 @@
+import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db';
-import { getOrSetCache, invalidateCacheKey } from '@/lib/cache';
+import { invalidateCacheKey } from '@/lib/cache';
 
-export async function getSiteSettings() {
-  return getOrSetCache('site_settings', 60, async () => {
+/**
+ * Fetch site settings with Next.js Data Cache tagging.
+ * Tagged with 'site_settings' so revalidateTag('site_settings') instantly clears it.
+ */
+export const getSiteSettings = unstable_cache(
+  async () => {
     let settings = await db.siteSetting.findFirst();
 
     if (!settings) {
@@ -25,8 +30,13 @@ export async function getSiteSettings() {
     }
 
     return settings;
-  });
-}
+  },
+  ['site_settings'],
+  {
+    tags: ['site_settings'],
+    revalidate: 30, // ISR fallback: max 30s staleness
+  }
+);
 
 export async function updateSiteSettings(data: {
   featuredProductId?: string | null;
@@ -55,6 +65,7 @@ export async function updateSiteSettings(data: {
     data,
   });
 
+  // Invalidate Redis cache layers (L1 + L2)
   await Promise.all([invalidateCacheKey('site_settings'), invalidateCacheKey('featured_product')]);
 
   return updated;

@@ -5,6 +5,9 @@ import { Footer } from '@/components/layout/Footer';
 import { ToastProvider } from '@/components/ui/Toast';
 import { getSiteSettings } from '@/lib/services/settings.service';
 
+// ISR fallback for layout: 10s — on-demand revalidation is instant via revalidateTag
+export const revalidate = 10;
+
 const CartDrawer = dynamic(
   () => import('@/components/cart/CartDrawer').then((mod) => mod.CartDrawer),
   { ssr: false }

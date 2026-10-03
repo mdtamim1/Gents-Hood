@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { getTrendingProducts } from '@/lib/services/product.service';
 import { TrendingCatalog } from '@/components/product/TrendingCatalog';
 
-export const revalidate = 30;
+// ISR: revalidate every 10 seconds (on-demand via revalidateTag is instant)
+export const revalidate = 10;
 
 export const metadata: Metadata = {
   title: 'Trending Pieces & Best of Gents Hood | Luxury Streetwear',

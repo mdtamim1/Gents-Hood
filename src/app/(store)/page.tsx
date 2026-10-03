@@ -9,8 +9,8 @@ import { getFeaturedProduct, getTrendingProducts } from '@/lib/services/product.
 import { getSiteSettings } from '@/lib/services/settings.service';
 import { getSiteUrl } from '@/lib/constants/site';
 
-// Incremental Static Regeneration (ISR) every 30 seconds
-export const revalidate = 30;
+// ISR: revalidate every 10 seconds (fast fallback — on-demand via revalidateTag is instant)
+export const revalidate = 10;
 
 export default async function HomePage() {
   // Fetch real database records in parallel via cached backend services
