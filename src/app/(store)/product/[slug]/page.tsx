@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { db } from '@/lib/db';
 import { getProductBySlug, getTrendingProducts } from '@/lib/services/product.service';
 import { ProductDetails } from '@/components/product/ProductDetails';
 import { ProductCard } from '@/components/product/ProductCard';
@@ -9,22 +8,12 @@ import { getSiteUrl } from '@/lib/constants/site';
 
 // ISR: revalidate every 10 seconds (on-demand via revalidateTag is instant)
 export const revalidate = 10;
+export const dynamicParams = true;
 
 interface ProductPageProps {
   params: {
     slug: string;
   };
-}
-
-export async function generateStaticParams() {
-  const products = await db.product.findMany({
-    where: { status: 'ACTIVE' },
-    select: { slug: true },
-  });
-
-  return products.map((p) => ({
-    slug: p.slug,
-  }));
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
