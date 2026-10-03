@@ -68,14 +68,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (autoCreateSteadfast || (courierName === 'Steadfast' && !courierTrackingNo)) {
       finalCourierName = 'Steadfast';
 
-      const fullAddress = [
-        order.shippingAddress,
-        order.shippingArea,
-        order.shippingThana,
-        order.shippingDistrict,
-      ]
-        .filter(Boolean)
-        .join(', ');
+      // As requested (Image 3): Steadfast recipient address strictly takes the Customer Address field
+      const recipientAddress =
+        order.shippingAddress?.trim() ||
+        [order.shippingThana, order.shippingArea, order.shippingDistrict]
+          .filter(Boolean)
+          .join(', ') ||
+        order.shippingDistrict ||
+        'Dhaka, Bangladesh';
 
       const codAmount =
         order.paymentStatus === 'PAID' ? 0 : Math.max(0, order.total - order.paidAmount);
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         invoice: order.orderNo,
         recipientName: order.shippingName,
         recipientPhone: order.shippingPhone,
-        recipientAddress: fullAddress || order.shippingDistrict || 'Dhaka, Bangladesh',
+        recipientAddress,
         codAmount,
         note: order.note || order.shopNote || undefined,
         itemDescription: itemsDesc || undefined,

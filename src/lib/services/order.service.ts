@@ -140,7 +140,8 @@ export async function createOrder(input: CreateOrderInput) {
     // Determine delivery charge (Free shipping completely turned off)
     const isDhaka =
       input.shippingDistrict.toLowerCase().includes('dhaka') ||
-      input.shippingArea.toLowerCase().includes('dhaka');
+      Boolean(input.shippingThana?.toLowerCase().includes('dhaka')) ||
+      Boolean(input.shippingArea?.toLowerCase().includes('dhaka'));
     const deliveryCharge = isDhaka ? insideDhakaFee : outsideDhakaFee;
 
     const total = subtotal + deliveryCharge;
@@ -178,7 +179,13 @@ export async function createOrder(input: CreateOrderInput) {
         shippingName: input.shippingName,
         shippingPhone: normalizedPhone,
         shippingDistrict: input.shippingDistrict,
-        shippingArea: input.shippingArea,
+        shippingThana: input.shippingThana?.trim() || input.shippingArea?.trim() || '',
+        shippingArea:
+          input.shippingThana &&
+          input.shippingArea &&
+          input.shippingArea.trim() !== input.shippingThana.trim()
+            ? input.shippingArea.trim()
+            : '',
         shippingAddress: input.shippingAddress,
         note: input.note,
         idempotencyKey: input.idempotencyKey,

@@ -12,6 +12,7 @@ import {
   XCircle,
   RotateCcw,
   Search,
+  Filter,
   Plus,
   Loader2,
   Edit2,
@@ -95,6 +96,7 @@ interface Order {
 
 interface Counts {
   today: number;
+  deliveredToday?: number;
   byStatus: Record<string, number>;
 }
 
@@ -205,14 +207,20 @@ function formatTimeOnly(d: string) {
   }
 }
 
-function isTodayOrder(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
+function isTodayOrder(dateStr?: string | null) {
+  if (!dateStr) return false;
+  try {
+    const toBdDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    return toBdDate(new Date(dateStr)) === toBdDate(new Date());
+  } catch {
+    return false;
+  }
 }
 
 export interface StaffMember {
@@ -270,6 +278,10 @@ export default function OrdersPageClient({
   const [staffFilterId, setStaffFilterId] = useState<string | null>(null);
   const [showStaffFilter, setShowStaffFilter] = useState(false);
   const staffFilterRef = useRef<HTMLDivElement>(null);
+  // All Orders status filter (Delivered / Cancelled)
+  const [allOrdersFilter, setAllOrdersFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [showStatusFilter, setShowStatusFilter] = useState(false);
+  const statusFilterRef = useRef<HTMLDivElement>(null);
   // Bulk assign
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkAssigning, setBulkAssigning] = useState(false);
@@ -416,6 +428,18 @@ export default function OrdersPageClient({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showStaffFilter]);
 
+  // Close status filter dropdown on outside click
+  useEffect(() => {
+    if (!showStatusFilter) return;
+    const handleClick = (e: MouseEvent) => {
+      if (statusFilterRef.current && !statusFilterRef.current.contains(e.target as Node)) {
+        setShowStatusFilter(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showStatusFilter]);
+
   // Close bulk assign dropdown on outside click
   useEffect(() => {
     if (!showBulkAssign) return;
@@ -435,7 +459,17 @@ export default function OrdersPageClient({
       // Tab filter (only when not searching)
       if (activeTab === 'today') {
         result = result.filter((o) => isTodayOrder(o.createdAt));
-      } else if (activeTab !== 'all') {
+      } else if (activeTab === 'completed') {
+        // Delivered tab: only orders delivered TODAY (resets at midnight!)
+        result = result.filter(
+          (o) =>
+            o.status === 'COMPLETED' && (isTodayOrder(o.updatedAt) || isTodayOrder(o.createdAt))
+        );
+      } else if (activeTab === 'all') {
+        if (allOrdersFilter !== 'ALL') {
+          result = result.filter((o) => o.status === allOrdersFilter);
+        }
+      } else {
         const tab = TABS.find((t) => t.id === activeTab);
         if (tab?.statusFilter) {
           result = result.filter((o) => o.status === tab.statusFilter);
@@ -457,10 +491,13 @@ export default function OrdersPageClient({
           o.shippingDistrict.toLowerCase().includes(q) ||
           (o.shippingThana && o.shippingThana.toLowerCase().includes(q))
       );
+      if (activeTab === 'all' && allOrdersFilter !== 'ALL') {
+        result = result.filter((o) => o.status === allOrdersFilter);
+      }
     }
 
     return result;
-  }, [orders, activeTab, search, staffFilterId]);
+  }, [orders, activeTab, search, staffFilterId, allOrdersFilter]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -525,6 +562,7 @@ export default function OrdersPageClient({
   const getTabCount = (tab: Tab): number => {
     if (tab === 'all') return orders.length;
     if (tab === 'today') return counts.today;
+    if (tab === 'completed') return counts.deliveredToday ?? counts.byStatus['COMPLETED'] ?? 0;
     const t = TABS.find((x) => x.id === tab);
     if (t?.statusFilter) return counts.byStatus[t.statusFilter] || 0;
     return 0;
@@ -884,6 +922,118 @@ export default function OrdersPageClient({
                       </div>
                     </button>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* All Orders Status Filter (Delivered / Cancelled) - requested by user */}
+          {activeTab === 'all' && (
+            <div className="relative" ref={statusFilterRef}>
+              <button
+                type="button"
+                onClick={() => setShowStatusFilter((p) => !p)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                  allOrdersFilter !== 'ALL'
+                    ? allOrdersFilter === 'COMPLETED'
+                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                      : 'border-rose-500/50 bg-rose-500/15 text-rose-300'
+                    : 'border-white/[0.08] bg-[#141416] text-zinc-300 hover:border-white/20 hover:text-white'
+                }`}
+                title="Filter All Orders by status"
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span>
+                  {allOrdersFilter === 'COMPLETED'
+                    ? 'Delivered'
+                    : allOrdersFilter === 'CANCELLED'
+                      ? 'Cancelled'
+                      : 'Filter Status'}
+                </span>
+                {allOrdersFilter !== 'ALL' ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAllOrdersFilter('ALL');
+                    }}
+                    className="ml-0.5 rounded-sm hover:text-white"
+                    title="Clear filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : (
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${showStatusFilter ? 'rotate-180' : ''}`}
+                  />
+                )}
+              </button>
+
+              {showStatusFilter && (
+                <div className="absolute left-0 top-full z-[200] mt-1.5 w-48 overflow-hidden rounded-xl border border-white/[0.12] bg-[#18181b] py-1 shadow-2xl">
+                  <div className="border-b border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                    Filter All Orders
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllOrdersFilter('ALL');
+                      setShowStatusFilter(false);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
+                      allOrdersFilter === 'ALL' ? 'font-bold text-white' : 'text-zinc-400'
+                    }`}
+                  >
+                    <ShoppingBag className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>All Orders</span>
+                    {allOrdersFilter === 'ALL' && (
+                      <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllOrdersFilter('COMPLETED');
+                      setShowStatusFilter(false);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
+                      allOrdersFilter === 'COMPLETED'
+                        ? 'font-bold text-emerald-300'
+                        : 'text-zinc-300'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Delivered</span>
+                    {typeof counts.byStatus?.['COMPLETED'] === 'number' && (
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        ({counts.byStatus['COMPLETED']})
+                      </span>
+                    )}
+                    {allOrdersFilter === 'COMPLETED' && (
+                      <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllOrdersFilter('CANCELLED');
+                      setShowStatusFilter(false);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${
+                      allOrdersFilter === 'CANCELLED' ? 'font-bold text-rose-300' : 'text-zinc-300'
+                    }`}
+                  >
+                    <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                    <span>Cancelled</span>
+                    {typeof counts.byStatus?.['CANCELLED'] === 'number' && (
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        ({counts.byStatus['CANCELLED']})
+                      </span>
+                    )}
+                    {allOrdersFilter === 'CANCELLED' && (
+                      <CheckCircle2 className="ml-auto h-3 w-3 text-emerald-400" />
+                    )}
+                  </button>
                 </div>
               )}
             </div>

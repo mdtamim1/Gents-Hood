@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
             { shippingPhone: { contains: search } },
             { shippingName: { contains: search } },
             { shippingDistrict: { contains: search } },
+            { shippingThana: { contains: search } },
+            { shippingArea: { contains: search } },
           ],
         },
       ];
@@ -105,15 +107,40 @@ export async function GET(request: NextRequest) {
     });
 
     // Today's count (only synced/manual orders)
-    const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayCount = await db.order.count({
-      where: {
-        createdAt: { gte: startOfToday },
-        ...(session.role !== 'OWNER' ? { assignedToId: session.id } : {}),
-        ...syncedFilter,
-      },
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Dhaka',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
     });
+    const parts = formatter.formatToParts(now);
+    const m = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+    const d = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+    const y = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+    const startOfToday = new Date(Date.UTC(y, m - 1, d, -6, 0, 0));
+
+    const [todayCount, deliveredTodayCount] = await Promise.all([
+      db.order.count({
+        where: {
+          createdAt: { gte: startOfToday },
+          ...(session.role !== 'OWNER' ? { assignedToId: session.id } : {}),
+          ...syncedFilter,
+        },
+      }),
+      db.order.count({
+        where: {
+          status: 'COMPLETED',
+          AND: [
+            syncedFilter,
+            {
+              OR: [{ updatedAt: { gte: startOfToday } }, { createdAt: { gte: startOfToday } }],
+            },
+          ],
+          ...(session.role !== 'OWNER' ? { assignedToId: session.id } : {}),
+        },
+      }),
+    ]);
 
     // Count unsynced web orders (pending in queue) for Sync button badge
     const unsyncedCount = await db.order.count({
@@ -153,6 +180,7 @@ export async function GET(request: NextRequest) {
       orders,
       counts: {
         today: todayCount,
+        deliveredToday: deliveredTodayCount,
         byStatus: Object.fromEntries(statusCounts.map((s) => [s.status, s._count.status])),
       },
       staffList,

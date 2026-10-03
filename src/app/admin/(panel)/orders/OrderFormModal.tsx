@@ -58,6 +58,7 @@ function formatHistoryDate(d: string) {
 interface Product {
   id: string;
   name: string;
+  sku?: string | null;
   price: number;
   images: { url: string }[];
   variants: ProductVariant[];
@@ -107,23 +108,43 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     return `GH-${rand}`;
   });
 
-  const [form, setForm] = useState({
-    shippingName: (editOrder?.shippingName as string) || '',
-    shippingPhone: (editOrder?.shippingPhone as string) || '',
-    shippingDistrict: (editOrder?.shippingDistrict as string) || 'Dhaka',
-    shippingThana: (editOrder?.shippingThana as string) || '',
-    shippingArea: (editOrder?.shippingArea as string) || '',
-    shippingAddress: (editOrder?.shippingAddress as string) || '',
-    paymentMethod: (editOrder?.paymentMethod as string) || 'COD',
-    paymentStatus: (editOrder?.paymentStatus as string) || 'UNPAID',
-    courierName: (editOrder?.courierName as string) || 'Pathao',
-    status: (editOrder?.status as string) || 'PROCESSING',
-    note: (editOrder?.note as string) || '',
-    shopNote: (editOrder?.shopNote as string) || '',
-    memo: '',
-    deliveryCharge: typeof editOrder?.deliveryCharge === 'number' ? editOrder.deliveryCharge : 120,
-    manualDiscount: (editOrder?.manualDiscount as number) || 0,
-    paidAmount: (editOrder?.paidAmount as number) || 0,
+  const [form, setForm] = useState(() => {
+    const district = (editOrder?.shippingDistrict as string) || 'Dhaka';
+    let thana = (editOrder?.shippingThana as string) || '';
+    let area = (editOrder?.shippingArea as string) || '';
+
+    // If thana is empty but area exists (e.g. past orders from customer checkout)
+    if (!thana && area) {
+      const upazilas = getUpazilas(district);
+      const matched = upazilas.find((u) => u.toLowerCase() === area.toLowerCase());
+      if (matched) {
+        thana = matched;
+        area = '';
+      } else {
+        thana = area;
+        area = '';
+      }
+    }
+
+    return {
+      shippingName: (editOrder?.shippingName as string) || '',
+      shippingPhone: (editOrder?.shippingPhone as string) || '',
+      shippingDistrict: district,
+      shippingThana: thana,
+      shippingArea: area,
+      shippingAddress: (editOrder?.shippingAddress as string) || '',
+      paymentMethod: (editOrder?.paymentMethod as string) || 'COD',
+      paymentStatus: (editOrder?.paymentStatus as string) || 'UNPAID',
+      courierName: (editOrder?.courierName as string) || 'Pathao',
+      status: (editOrder?.status as string) || 'PROCESSING',
+      note: (editOrder?.note as string) || '',
+      shopNote: (editOrder?.shopNote as string) || '',
+      memo: '',
+      deliveryCharge:
+        typeof editOrder?.deliveryCharge === 'number' ? editOrder.deliveryCharge : 120,
+      manualDiscount: (editOrder?.manualDiscount as number) || 0,
+      paidAmount: (editOrder?.paidAmount as number) || 0,
+    };
   });
 
   // Date formatted for date input
@@ -169,7 +190,6 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [initialProducts, setInitialProducts] = useState<Product[]>([]);
-  const [loadingInitial, setLoadingInitial] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -211,33 +231,41 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
     return form.shippingDistrict ? getUpazilas(form.shippingDistrict) : [];
   }, [form.shippingDistrict]);
 
-  // Fetch initial active products so staff can see and select products immediately
+  // Fetch initial active products for fast lookup but keep searchResults empty until user searches
   useEffect(() => {
     let isMounted = true;
-    setLoadingInitial(true);
     fetch('/api/admin/products?status=ACTIVE')
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data.success && Array.isArray(data.products)) {
           setInitialProducts(data.products);
-          setSearchResults(data.products.slice(0, 8));
+          // NOTE: Do not pre-fill searchResults — only show when user searches
         }
       })
-      .catch((err) => console.error('Failed to load initial products:', err))
-      .finally(() => {
-        if (isMounted) setLoadingInitial(false);
-      });
+      .catch((err) => console.error('Failed to load initial products:', err));
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Search products debounced
+  // Search products debounced (only show products when search query is typed)
   useEffect(() => {
     if (!productSearch.trim()) {
-      setSearchResults(initialProducts.slice(0, 8));
+      setSearchResults([]);
       return;
     }
+
+    // Instant local filter if initialProducts already loaded (supports partial name or SKU)
+    const q = productSearch.toLowerCase().trim();
+    if (initialProducts.length > 0) {
+      const localMatches = initialProducts.filter(
+        (p) => p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))
+      );
+      if (localMatches.length > 0) {
+        setSearchResults(localMatches.slice(0, 8));
+      }
+    }
+
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
@@ -781,13 +809,13 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
                       placeholder="Search product name or SKU..."
                       className="w-full rounded-lg border border-white/[0.08] bg-[#141416] py-2 pl-9 pr-8 text-xs text-white placeholder-zinc-500 outline-none focus:border-zinc-500"
                     />
-                    {(isSearching || loadingInitial) && (
+                    {isSearching && (
                       <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-zinc-400" />
                     )}
                   </div>
 
-                  {/* Dropdown Search Results */}
-                  {searchResults.length > 0 && !selectedProduct && (
+                  {/* Dropdown Search Results (Only show when search query is typed) */}
+                  {productSearch.trim() && searchResults.length > 0 && !selectedProduct && (
                     <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#131315] shadow-xl">
                       {searchResults.map((product) => {
                         const colorsCount = new Set(
@@ -854,7 +882,6 @@ export function OrderFormModal({ onClose, onSuccess, editOrder }: OrderFormModal
 
                   {/* Empty state when search yields no products */}
                   {!isSearching &&
-                    !loadingInitial &&
                     searchResults.length === 0 &&
                     productSearch.trim() &&
                     !selectedProduct && (

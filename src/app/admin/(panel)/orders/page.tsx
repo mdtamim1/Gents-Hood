@@ -43,9 +43,20 @@ export default async function AdminOrdersPage() {
     }),
     // Status counts (only synced/manual)
     (async () => {
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const [statusCounts, todayCount] = await Promise.all([
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      });
+      const parts = formatter.formatToParts(now);
+      const m = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+      const d = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+      const y = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+      const startOfToday = new Date(Date.UTC(y, m - 1, d, -6, 0, 0));
+
+      const [statusCounts, todayCount, deliveredTodayCount] = await Promise.all([
         db.order.groupBy({
           by: ['status'],
           _count: { status: true },
@@ -58,9 +69,22 @@ export default async function AdminOrdersPage() {
             createdAt: { gte: startOfToday },
           },
         }),
+        db.order.count({
+          where: {
+            ...whereClause,
+            status: 'COMPLETED',
+            AND: [
+              syncedFilter,
+              {
+                OR: [{ updatedAt: { gte: startOfToday } }, { createdAt: { gte: startOfToday } }],
+              },
+            ],
+          },
+        }),
       ]);
       return {
         today: todayCount,
+        deliveredToday: deliveredTodayCount,
         byStatus: Object.fromEntries(statusCounts.map((s) => [s.status, s._count.status])),
       };
     })(),

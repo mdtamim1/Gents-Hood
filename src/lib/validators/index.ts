@@ -16,7 +16,8 @@ export const createOrderSchema = z.object({
     return /^01[3-9]\d{8}$/.test(normalized);
   }, 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX or +8801XXXXXXXXX)'),
   shippingDistrict: z.string().min(2, 'District is required'),
-  shippingArea: z.string().min(2, 'Area or Thana is required'),
+  shippingThana: z.string().optional(),
+  shippingArea: z.string().optional(),
   shippingAddress: z.string().min(5, 'Full street address is required'),
   note: z.string().max(500).optional(),
   items: z.array(createOrderItemSchema).min(1, 'At least one item is required'),

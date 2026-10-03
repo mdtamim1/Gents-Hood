@@ -69,6 +69,7 @@ export function CheckoutForm() {
   const [shippingName, setShippingName] = useState<string>('');
   const [shippingPhone, setShippingPhone] = useState<string>('');
   const [shippingDistrict, setShippingDistrict] = useState<string>('Dhaka');
+  const [shippingThana, setShippingThana] = useState<string>('');
   const [shippingArea, setShippingArea] = useState<string>('');
   const [shippingAddress, setShippingAddress] = useState<string>('');
   const [note, setNote] = useState<string>('');
@@ -124,6 +125,8 @@ export function CheckoutForm() {
         if (parsed.shippingName) setShippingName(parsed.shippingName);
         if (parsed.shippingPhone) setShippingPhone(parsed.shippingPhone);
         if (parsed.shippingDistrict) setShippingDistrict(parsed.shippingDistrict);
+        if (parsed.shippingThana) setShippingThana(parsed.shippingThana);
+        else if (parsed.shippingArea) setShippingThana(parsed.shippingArea);
         if (parsed.shippingArea) setShippingArea(parsed.shippingArea);
         if (parsed.shippingAddress) setShippingAddress(parsed.shippingAddress);
         if (parsed.note) setNote(parsed.note);
@@ -198,8 +201,8 @@ export function CheckoutForm() {
       newErrors.shippingDistrict = 'Please select your delivery district.';
     }
 
-    if (!shippingArea.trim() || shippingArea.trim().length < 2) {
-      newErrors.shippingArea = 'Please enter your area, thana, or police station.';
+    if (!shippingThana.trim() || shippingThana.trim().length < 2) {
+      newErrors.shippingThana = 'Please select your thana or upazila.';
     }
 
     if (!shippingAddress.trim() || shippingAddress.trim().length < 5) {
@@ -218,6 +221,7 @@ export function CheckoutForm() {
           shippingName,
           shippingPhone,
           shippingDistrict,
+          shippingThana,
           shippingArea,
           shippingAddress,
           note,
@@ -283,6 +287,7 @@ export function CheckoutForm() {
         shippingName: shippingName.trim(),
         shippingPhone: phoneValidation.normalized,
         shippingDistrict,
+        shippingThana: shippingThana.trim(),
         shippingArea: shippingArea.trim(),
         shippingAddress: shippingAddress.trim(),
         note: note.trim() || undefined,
@@ -440,6 +445,7 @@ export function CheckoutForm() {
                   value={shippingDistrict}
                   onChange={(e) => {
                     setShippingDistrict(e.target.value);
+                    setShippingThana('');
                     setShippingArea('');
                   }}
                   error={errors.shippingDistrict}
@@ -448,9 +454,9 @@ export function CheckoutForm() {
                 <Select
                   label="Thana / Upazila *"
                   options={thanaOptions}
-                  value={shippingArea}
-                  onChange={(e) => setShippingArea(e.target.value)}
-                  error={errors.shippingArea}
+                  value={shippingThana}
+                  onChange={(e) => setShippingThana(e.target.value)}
+                  error={errors.shippingThana}
                   disabled={!shippingDistrict || thanaOptions.length === 0}
                   placeholder={shippingDistrict ? 'Select Thana' : 'Select district first'}
                 />
@@ -572,7 +578,7 @@ export function CheckoutForm() {
                       </span>
                     </div>
                     <p className="truncate text-[11px] text-muted">
-                      {shippingAddress}, {shippingArea}, {shippingDistrict}
+                      {shippingAddress}, {shippingThana || shippingArea}, {shippingDistrict}
                     </p>
                   </div>
                 </div>
@@ -627,7 +633,7 @@ export function CheckoutForm() {
                         Full Address
                       </span>
                       <p className="mt-0.5 font-medium text-ink">
-                        {shippingAddress}, {shippingArea}, {shippingDistrict}
+                        {shippingAddress}, {shippingThana || shippingArea}, {shippingDistrict}
                       </p>
                       <span className="mt-1.5 inline-block border border-line bg-cream px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
                         {isDhaka

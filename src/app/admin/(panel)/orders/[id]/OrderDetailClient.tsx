@@ -36,6 +36,7 @@ interface OrderDetail {
   shippingName: string;
   shippingPhone: string;
   shippingDistrict: string;
+  shippingThana?: string | null;
   shippingArea: string;
   shippingAddress: string;
   note?: string | null;
@@ -226,7 +227,14 @@ export function OrderDetailClient({ initialOrder }: { initialOrder: OrderDetail 
                   Full Address
                 </span>
                 <p className="mt-0.5 text-cream">
-                  {order.shippingAddress}, {order.shippingArea}, {order.shippingDistrict}
+                  {[
+                    order.shippingAddress,
+                    order.shippingThana,
+                    order.shippingArea,
+                    order.shippingDistrict,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
                 </p>
               </div>
 

@@ -36,6 +36,7 @@ interface OrderSuccessClientProps {
     shippingName: string;
     shippingPhone: string;
     shippingDistrict: string;
+    shippingThana?: string;
     shippingArea: string;
     shippingAddress: string;
     note?: string | null;
@@ -351,7 +352,14 @@ export function OrderSuccessClient({ order, siteSettings }: OrderSuccessClientPr
               <p className="mt-1 text-sm font-bold text-ink">{order.shippingName}</p>
               <p className="font-mono text-xs text-muted">{order.shippingPhone}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                {order.shippingAddress}, {order.shippingArea}, {order.shippingDistrict}
+                {[
+                  order.shippingAddress,
+                  order.shippingThana,
+                  order.shippingArea,
+                  order.shippingDistrict,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
               </p>
             </div>
 

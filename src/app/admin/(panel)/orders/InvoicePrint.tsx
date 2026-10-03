@@ -111,14 +111,28 @@ function buildInvoicePage(order: PrintableOrder, confirmedBy: string): string {
     )
     .join('');
 
-  const shippingParts = [
-    order.shippingAddress,
-    order.shippingThana,
-    order.shippingArea,
-    order.shippingDistrict,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  // Invoice Print location: strictly district, thana/upazela, and area
+  const locationParts: string[] = [];
+  if (order.shippingArea && order.shippingArea.trim()) {
+    locationParts.push(order.shippingArea.trim());
+  }
+  if (
+    order.shippingThana &&
+    order.shippingThana.trim() &&
+    !locationParts.some((p) => p.toLowerCase() === order.shippingThana?.trim().toLowerCase())
+  ) {
+    locationParts.push(order.shippingThana.trim());
+  }
+  if (
+    order.shippingDistrict &&
+    order.shippingDistrict.trim() &&
+    !locationParts.some((p) => p.toLowerCase() === order.shippingDistrict?.trim().toLowerCase())
+  ) {
+    locationParts.push(order.shippingDistrict.trim());
+  }
+
+  const shippingParts =
+    locationParts.length > 0 ? locationParts.join(', ') : order.shippingAddress?.trim() || '—';
 
   const due = Math.max(0, order.total - order.paidAmount);
 
@@ -214,10 +228,14 @@ function buildInvoicePage(order: PrintableOrder, confirmedBy: string): string {
           <span style="font-size:14px;font-weight:800;color:#111827;">GRAND TOTAL</span>
           <span style="font-size:18px;font-weight:900;color:#111827;">৳${order.total.toLocaleString()}</span>
         </div>
-        ${order.paidAmount > 0 ? `
+        ${
+          order.paidAmount > 0
+            ? `
           <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span style="color:#10b981;">Paid Amount</span><span style="font-weight:700;color:#10b981;">৳${order.paidAmount.toLocaleString()}</span></div>
           <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span style="color:#ef4444;">Due Amount</span><span style="font-weight:700;color:#ef4444;">৳${due.toLocaleString()}</span></div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     </div>
 
