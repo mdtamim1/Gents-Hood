@@ -1012,23 +1012,7 @@ export default function OrdersPageClient({
 
             {/* Table Body */}
             <tbody className="divide-y divide-white/[0.04]">
-              {/* Task 1: When 'all' tab is active and search is empty, prompt user to search */}
-              {activeTab === 'all' && !search.trim() ? (
-                <tr>
-                  <td colSpan={9} className="py-16 text-center">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-                        <Search className="h-7 w-7 text-zinc-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-zinc-300">Search Orders</p>
-                      <p className="max-w-xs text-xs text-zinc-500">
-                        Type an order ID, customer name, or phone number in the search box above to
-                        find orders across your entire store.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredOrders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
