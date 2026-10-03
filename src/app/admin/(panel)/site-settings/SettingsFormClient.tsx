@@ -1811,20 +1811,6 @@ export function SettingsFormClient({ initialSettings }: { initialSettings: SiteS
           </div>
         </div>
       )}
-
-      {/* ─── Bottom Floating Save Bar ─── */}
-      <div className="fixed bottom-6 right-8 z-40">
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          isLoading={isSaving}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#800020] via-[#5C0612] to-[#800020] px-6 py-3 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-[0_10px_30px_rgba(128,0,32,0.5)] transition-all hover:scale-105 active:scale-95"
-        >
-          <Save className="h-4 w-4" />
-          Save All Settings
-        </Button>
-      </div>
     </form>
   );
 }
